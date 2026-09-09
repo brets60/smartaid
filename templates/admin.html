@@ -7,10 +7,17 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
             <div class="flex items-center gap-3">
+                {% if current_user and current_user.role == 'barangay_staff' %}
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Barangay {{ current_user.assigned_barangay }} Operations Workstation</h1>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    Barangay Staff • {{ current_user.assigned_barangay }}
+                </span>
+                {% else %}
                 <h1 class="text-2xl font-bold text-slate-900 tracking-tight">LGU Maramag Welfare Operations Command</h1>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                     Bukidnon • Active
                 </span>
+                {% endif %}
             </div>
             <p class="text-sm text-slate-500 mt-1">
                 Municipality of Maramag Relief Program: <strong id="active-program-name-display" class="text-slate-800">{{ active_program.program_name if active_program else 'No Active Program' }}</strong>
@@ -28,12 +35,14 @@
                 {% endfor %}
             </select>
 
-            <!-- Criteria Weights Modal Trigger -->
+            <!-- Criteria Weights Modal Trigger (Admin / Social Worker only) -->
+            {% if not current_user or current_user.role != 'barangay_staff' %}
             <button onclick="openWeightModal()"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm transition-all">
                 <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-600"></i>
                 <span>Criteria Weights (MCDA)</span>
             </button>
+            {% endif %}
 
             <!-- Broadcast SMS & Notices Button -->
             <button onclick="openBroadcastModal()"
@@ -42,12 +51,14 @@
                 <span>Broadcast SMS & Notices</span>
             </button>
 
-            <!-- Reset Households Button -->
+            <!-- Reset Households Button (Admin only) -->
+            {% if current_user and current_user.role == 'admin' %}
             <button onclick="confirmResetHouseholds()"
                 class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 shadow-sm transition-all" title="Clear all households to input fresh data">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 <span>Clear Applicants</span>
             </button>
+            {% endif %}
 
             <!-- Re-Evaluate Engine Button -->
             <button onclick="triggerEvaluation()" id="eval-btn"
@@ -119,16 +130,51 @@
                 <p class="text-xs text-slate-500">Deterministic ranking derived from normalized poverty, dependency, and vulnerability vectors.</p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2.5">
                 <!-- Search Input -->
-                <div class="relative rounded-lg shadow-sm w-64">
+                <div class="relative rounded-lg shadow-sm w-48">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                         <i data-lucide="search" class="w-4 h-4"></i>
                     </div>
                     <input type="text" id="table-search" oninput="filterTable()"
                         class="block w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs placeholder-slate-400 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="Filter name, ref, barangay...">
+                        placeholder="Search name, ref...">
                 </div>
+
+                <!-- Filter by Barangay Dropdown -->
+                <div class="relative">
+                    <select id="filter-barangay" onchange="onBarangayFilterChange()"
+                        class="block w-44 px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 bg-white shadow-2xs focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="ALL">📍 All 20 Barangays</option>
+                        <option value="North Poblacion">North Poblacion</option>
+                        <option value="South Poblacion">South Poblacion</option>
+                        <option value="Base Camp">Base Camp</option>
+                        <option value="Dologon">Dologon</option>
+                        <option value="Musuan">Musuan</option>
+                        <option value="Camp 1">Camp 1</option>
+                        <option value="Panadtalan">Panadtalan</option>
+                        <option value="Dagumbaan">Dagumbaan</option>
+                        <option value="Kuya">Kuya</option>
+                        <option value="San Miguel">San Miguel</option>
+                        <option value="San Roque">San Roque</option>
+                        <option value="Colambugon">Colambugon</option>
+                        <option value="Anahawon">Anahawon</option>
+                        <option value="Bayabason">Bayabason</option>
+                        <option value="Tubigon">Tubigon</option>
+                        <option value="La Asuncion">La Asuncion</option>
+                        <option value="Dibulang">Dibulang</option>
+                        <option value="Kisanayan">Kisanayan</option>
+                        <option value="Danggawan">Danggawan</option>
+                        <option value="Panalsalan">Panalsalan</option>
+                    </select>
+                </div>
+
+                <!-- Layout Toggle (Group by Barangay vs Flat List) -->
+                <button type="button" id="toggle-group-btn" onclick="toggleBarangayGrouping()"
+                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5 shadow-2xs transition-all" title="Toggle grouping rows by barangay">
+                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                    <span id="toggle-group-label">Grouped by Barangay: ON</span>
+                </button>
 
                 <!-- Status Filter Pills -->
                 <div class="inline-flex rounded-lg border border-slate-300 p-0.5 bg-slate-100 text-xs font-medium text-slate-600">
@@ -717,5 +763,13 @@
     </div>
 </div>
 
+<script>
+    window.CURRENT_USER = {
+        role: "{{ current_user.role if current_user else 'guest' }}",
+        username: "{{ current_user.username if current_user else '' }}",
+        fullName: "{{ current_user.full_name if current_user else '' }}",
+        assignedBarangay: "{{ current_user.assigned_barangay if current_user and current_user.assigned_barangay else '' }}"
+    };
+</script>
 <script src="/static/js/admin.js"></script>
 {% endblock %}

@@ -4,8 +4,23 @@ let currentProgramId = null;
 let allAllocations = [];
 let currentProgramRules = null;
 let activeFilter = 'ALL';
+let activeBarangayFilter = 'ALL';
+let isGroupedByBarangay = true;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Check logged-in user context
+    if (window.CURRENT_USER && window.CURRENT_USER.assignedBarangay) {
+        activeBarangayFilter = window.CURRENT_USER.assignedBarangay;
+        const bSelect = document.getElementById('filter-barangay');
+        if (bSelect) {
+            bSelect.value = window.CURRENT_USER.assignedBarangay;
+            if (window.CURRENT_USER.role === 'barangay_staff') {
+                bSelect.disabled = true;
+                bSelect.title = `Locked to your assigned jurisdiction: Barangay ${window.CURRENT_USER.assignedBarangay}`;
+            }
+        }
+    }
+
     const progSelect = document.getElementById('program-select');
     if (progSelect && progSelect.value) {
         currentProgramId = progSelect.value;
@@ -41,12 +56,14 @@ async function loadProgramData(programId) {
 }
 
 function updateDashboardMetrics(program) {
-    const stats = program.stats || {};
-    document.getElementById('stat-quota').textContent = program.total_quota_slots || 0;
+    const stats = program.statistics || {};
+    document.getElementById('stat-total-households').textContent = stats.total_evaluated || 0;
     document.getElementById('stat-approved').textContent = stats.approved_count || 0;
-    document.getElementById('stat-quota-util').textContent = `${stats.utilization_percent || 0}% quota allocated`;
-    document.getElementById('stat-disbursed').textContent = stats.disbursed_count || 0;
     
+    const quota = program.quota_limit || 10;
+    document.getElementById('stat-quota-util').textContent = `${Math.min(100, Math.round((stats.approved_count / quota) * 100))}% of ${quota} quota filled`;
+    
+    document.getElementById('stat-disbursed').textContent = stats.disbursed_count || 0;
     const pctDisb = stats.approved_count > 0 ? Math.round((stats.disbursed_count / stats.approved_count) * 100) : 0;
     document.getElementById('stat-disbursed-pct').textContent = `${pctDisb}% of approved disbursed`;
     
@@ -59,7 +76,7 @@ function renderAllocationsTable(allocations) {
     if (!allocations || allocations.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="py-10 text-center text-slate-400">
+                <td colspan="9" class="py-12 text-center text-slate-400">
                     No applicant allocations found for this program. Run evaluation or register applicants.
                 </td>
             </tr>
@@ -74,13 +91,18 @@ function renderAllocationsTable(allocations) {
         if (activeFilter !== 'ALL' && a.status !== activeFilter) {
             return false;
         }
+        // Barangay filter
+        const hh = a.household || {};
+        if (activeBarangayFilter !== 'ALL' && hh.barangay !== activeBarangayFilter) {
+            return false;
+        }
         // Search filter
         if (searchVal) {
-            const hh = a.household || {};
             const matchName = (hh.head_name || '').toLowerCase().includes(searchVal);
             const matchRef = (hh.reference_number || '').toLowerCase().includes(searchVal);
             const matchBrgy = (hh.barangay || '').toLowerCase().includes(searchVal);
-            return matchName || matchRef || matchBrgy;
+            const matchPurok = (hh.purok_zone || '').toLowerCase().includes(searchVal);
+            return matchName || matchRef || matchBrgy || matchPurok;
         }
         return true;
     });
@@ -88,15 +110,20 @@ function renderAllocationsTable(allocations) {
     if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="py-10 text-center text-slate-400">
-                    No matching records found.
+                <td colspan="9" class="py-12 text-center text-slate-400">
+                    <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                        <i data-lucide="search-x" class="w-5 h-5"></i>
+                    </div>
+                    <p class="text-xs font-semibold text-slate-600">No applicant records found.</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Try selecting a different barangay, status, or search term.</p>
                 </td>
             </tr>
         `;
+        lucide.createIcons();
         return;
     }
 
-    tbody.innerHTML = filtered.map((a) => {
+    const renderRowHtml = (a) => {
         const hh = a.household || {};
         
         // Status badge styling
@@ -121,7 +148,7 @@ function renderAllocationsTable(allocations) {
 
         // Rank pill
         const rankDisplay = a.rank > 0 ? 
-            `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono font-bold ${a.status === 'Approved' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'}">#${a.rank}</span>` :
+            `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono font-bold ${a.status === 'Approved' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-200 text-slate-700'}">#${a.rank}</span>` :
             `<span class="text-slate-300 text-sm font-bold pl-2.5">-</span>`;
 
         // Flags
@@ -138,7 +165,7 @@ function renderAllocationsTable(allocations) {
                     <div class="text-[11px] font-mono text-slate-400">${hh.reference_number || ''}</div>
                 </td>
                 <td class="px-3 py-3 text-slate-600">
-                    <div>${hh.barangay || ''}</div>
+                    <div class="font-semibold text-slate-800">${hh.barangay || ''}</div>
                     <div class="text-[11px] text-slate-400">${hh.purok_zone || ''}</div>
                 </td>
                 <td class="px-3 py-3 font-mono text-slate-700 font-medium">
@@ -172,9 +199,80 @@ function renderAllocationsTable(allocations) {
                 </td>
             </tr>
         `;
-    }).join('');
+    };
+
+    if (!isGroupedByBarangay) {
+        tbody.innerHTML = filtered.map(renderRowHtml).join('');
+    } else {
+        // Group by Barangay
+        const groups = {};
+        filtered.forEach(a => {
+            const b = a.household?.barangay || 'Unspecified Barangay';
+            if (!groups[b]) groups[b] = [];
+            groups[b].push(a);
+        });
+
+        let html = '';
+        Object.keys(groups).sort().forEach(bName => {
+            const bAllocs = groups[bName];
+            const approvedCount = bAllocs.filter(x => x.status === 'Approved').length;
+            const waitlistCount = bAllocs.filter(x => x.status === 'Waitlisted').length;
+            const disqCount = bAllocs.filter(x => x.status === 'Disqualified').length;
+
+            html += `
+                <tr class="bg-indigo-50/70 border-t-2 border-indigo-200">
+                    <td colspan="9" class="py-2.5 px-4 sm:px-6">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-md bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs">📍</span>
+                                <span class="text-xs font-extrabold text-slate-900 tracking-wide">BARANGAY ${bName.toUpperCase()}</span>
+                                <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-white text-indigo-800 font-bold border border-indigo-200 shadow-2xs">
+                                    ${bAllocs.length} Household${bAllocs.length > 1 ? 's' : ''} Registered
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-3 text-[11px] font-semibold">
+                                <span class="text-emerald-700 font-bold flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                    ${approvedCount} Approved
+                                </span>
+                                ${waitlistCount > 0 ? `<span class="text-amber-700 font-bold flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>${waitlistCount} Waitlisted</span>` : ''}
+                                ${disqCount > 0 ? `<span class="text-rose-600 font-bold flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>${disqCount} Disqualified</span>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            html += bAllocs.map(renderRowHtml).join('');
+        });
+
+        tbody.innerHTML = html;
+    }
 
     lucide.createIcons();
+}
+
+function onBarangayFilterChange() {
+    const sel = document.getElementById('filter-barangay');
+    if (sel) {
+        activeBarangayFilter = sel.value;
+        filterTable();
+    }
+}
+
+function toggleBarangayGrouping() {
+    isGroupedByBarangay = !isGroupedByBarangay;
+    const btnLabel = document.getElementById('toggle-group-label');
+    const btn = document.getElementById('toggle-group-btn');
+    if (btnLabel && btn) {
+        if (isGroupedByBarangay) {
+            btnLabel.textContent = 'Grouped by Barangay: ON';
+            btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5 shadow-2xs transition-all';
+        } else {
+            btnLabel.textContent = 'Grouped by Barangay: OFF';
+            btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200 flex items-center gap-1.5 shadow-2xs transition-all';
+        }
+    }
+    filterTable();
 }
 
 function filterTable() {
@@ -458,6 +556,19 @@ function openBroadcastModal() {
     document.getElementById('broadcast-modal').classList.remove('hidden');
     loadSmsSettings();
     loadRecentBroadcasts();
+
+    // If logged in as Barangay Staff, lock target barangay to their jurisdiction
+    if (window.CURRENT_USER && window.CURRENT_USER.assignedBarangay) {
+        const bSelect = document.getElementById('broadcast-barangay');
+        if (bSelect) {
+            bSelect.value = window.CURRENT_USER.assignedBarangay;
+            if (window.CURRENT_USER.role === 'barangay_staff') {
+                bSelect.disabled = true;
+                bSelect.title = `Locked to Barangay ${window.CURRENT_USER.assignedBarangay}`;
+            }
+        }
+    }
+
     lucide.createIcons();
 }
 
@@ -595,7 +706,7 @@ async function handleSendBroadcast(e) {
     const payload = {
         title: document.getElementById('broadcast-title').value.trim(),
         category: document.getElementById('broadcast-category').value,
-        target_barangay: document.getElementById('broadcast-barangay').value,
+        target_barangay: (window.CURRENT_USER && window.CURRENT_USER.assignedBarangay) ? window.CURRENT_USER.assignedBarangay : document.getElementById('broadcast-barangay').value,
         target_status: document.getElementById('broadcast-status').value,
         message: document.getElementById('broadcast-message').value.trim(),
         dispatch_sms: document.getElementById('broadcast-dispatch-sms').checked

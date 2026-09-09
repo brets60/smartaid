@@ -48,7 +48,7 @@ from schemas import (
 from auth import (
     verify_password, get_password_hash, create_access_token,
     get_current_user, get_current_active_user_optional,
-    require_admin, require_worker, require_agent_or_above,
+    require_admin, require_worker, require_agent_or_above, require_worker_or_barangay,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from engine import MCDAEngine
@@ -110,7 +110,7 @@ async def view_admin(
     user: Optional[User] = Depends(get_current_active_user_optional),
     db: Session = Depends(get_db)
 ):
-    if not user or user.role not in ["admin", "social_worker"]:
+    if not user or user.role not in ["admin", "social_worker", "barangay_staff"]:
         return RedirectResponse(url="/login?error=unauthorized_admin", status_code=status.HTTP_303_SEE_OTHER)
 
     programs = db.query(AidProgram).order_by(AidProgram.created_at.desc()).all()
@@ -208,7 +208,7 @@ async def login_for_access_token(
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "role": user.role, "full_name": user.full_name},
+        data={"sub": user.username, "role": user.role, "full_name": user.full_name, "assigned_barangay": user.assigned_barangay},
         expires_delta=access_token_expires
     )
 
@@ -433,7 +433,7 @@ async def reset_households(
 async def get_household(
     household_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_worker)
+    current_user: User = Depends(require_worker_or_barangay)
 ):
     household = db.query(Household).filter(Household.id == household_id).first()
     if not household:
@@ -445,7 +445,7 @@ async def update_household(
     household_id: str,
     household_update: HouseholdUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_worker)
+    current_user: User = Depends(require_worker_or_barangay)
 ):
     household = db.query(Household).filter(Household.id == household_id).first()
     if not household:
@@ -906,13 +906,19 @@ async def save_sms_settings(
 async def broadcast_notification(
     payload: AnnouncementCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_worker)
+    current_user: User = Depends(require_worker_or_barangay)
 ):
+    target_barangay = payload.target_barangay
+
+    # Enforce jurisdiction for barangay staff
+    if current_user.role == "barangay_staff" and current_user.assigned_barangay:
+        target_barangay = current_user.assigned_barangay
+
     query = db.query(Household)
 
     # Filter by Barangay
-    if payload.target_barangay and payload.target_barangay != "All":
-        query = query.filter(Household.barangay == payload.target_barangay)
+    if target_barangay and target_barangay != "All":
+        query = query.filter(Household.barangay == target_barangay)
 
     # Filter by Allocation Status if specified
     if payload.target_status and payload.target_status != "All":
@@ -927,9 +933,10 @@ async def broadcast_notification(
     # Dispatch via Semaphore Gateway (Real if key exists, Simulated if no key)
     sms_result = None
     if payload.dispatch_sms and phone_numbers:
-        print(f"\n[SMS DISPATCH - LGU MARAMAG MSWDO]")
+        agency_name = f"BARANGAY {target_barangay.upper()}" if (current_user.role == "barangay_staff" and target_barangay) else "LGU MARAMAG MSWDO"
+        print(f"\n[SMS DISPATCH - {agency_name}]")
         print(f"Announcement: {payload.title} ({payload.category})")
-        print(f"Target Barangay: {payload.target_barangay} | Status: {payload.target_status}")
+        print(f"Target Barangay: {target_barangay} | Status: {payload.target_status}")
         print(f"Sending broadcast to {len(phone_numbers)} registered household mobile numbers...")
         for h in households[:5]:
             print(f"  -> [Target: {h.contact_number} ({h.head_name} - {h.barangay})]: {payload.message}")
@@ -940,7 +947,7 @@ async def broadcast_notification(
     announcement = Announcement(
         title=payload.title.strip(),
         category=payload.category.strip(),
-        target_barangay=payload.target_barangay if payload.target_barangay != "All" else None,
+        target_barangay=target_barangay if target_barangay != "All" else None,
         target_status=payload.target_status if payload.target_status != "All" else None,
         message=payload.message.strip(),
         sms_dispatched=payload.dispatch_sms,

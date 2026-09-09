@@ -110,10 +110,19 @@ def require_worker(current_user: User = Depends(get_current_user)) -> User:
         )
     return current_user
 
+def require_worker_or_barangay(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role not in ["admin", "social_worker", "barangay_staff"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation requires administrator, social worker, or barangay staff privileges."
+        )
+    return current_user
+
 def require_agent_or_above(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in ["admin", "social_worker", "field_agent"]:
+    if current_user.role not in ["admin", "social_worker", "field_agent", "barangay_staff"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operation requires authenticated staff credentials."
         )
     return current_user
+
