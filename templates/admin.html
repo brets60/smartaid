@@ -171,6 +171,170 @@
 </div>
 
 <!-- ========================================================================= -->
+<!-- MODAL: VIEW & UPDATE HOUSEHOLD SOCIOECONOMIC PROFILE -->
+<!-- ========================================================================= -->
+<div id="household-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onclick="closeHouseholdModal()"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-8">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                        <i data-lucide="home" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 id="edit-hh-modal-title" class="font-bold text-slate-900 text-base">Household Profile</h3>
+                            <span id="edit-hh-ref-badge" class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-500">LGU Maramag Social Welfare & Development Beneficiary Intake Record</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a id="edit-hh-track-link" href="#" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
+                        <span>View Voucher</span>
+                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                    </a>
+                    <button type="button" onclick="closeHouseholdModal()" class="text-slate-400 hover:text-slate-600 ml-1">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Profile Form -->
+            <form id="household-form" onsubmit="saveHouseholdChanges(event)" class="space-y-4">
+                <input type="hidden" id="edit-hh-id">
+
+                <!-- Row 1: Head Name & Contact -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Household Head Full Name *</label>
+                        <input type="text" id="edit-hh-head-name" required placeholder="e.g. Juan Dela Cruz"
+                            class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Contact Number (Mobile) *</label>
+                        <input type="text" id="edit-hh-contact" required placeholder="09XXXXXXXXX"
+                            class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                    </div>
+                </div>
+
+                <!-- Row 2: Barangay, Purok, Street -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Barangay (Maramag) *</label>
+                        <select id="edit-hh-barangay" required
+                            class="mt-1 block w-full px-2.5 py-2 border border-slate-300 rounded-lg text-xs bg-white">
+                            <option value="North Poblacion">North Poblacion</option>
+                            <option value="South Poblacion">South Poblacion</option>
+                            <option value="Base Camp">Base Camp</option>
+                            <option value="Dologon">Dologon</option>
+                            <option value="Musuan">Musuan</option>
+                            <option value="Camp 1">Camp 1</option>
+                            <option value="Panadtalan">Panadtalan</option>
+                            <option value="Dagumbaan">Dagumbaan</option>
+                            <option value="Kuya">Kuya</option>
+                            <option value="San Miguel">San Miguel</option>
+                            <option value="San Roque">San Roque</option>
+                            <option value="Colambugon">Colambugon</option>
+                            <option value="Anahawon">Anahawon</option>
+                            <option value="Bayabason">Bayabason</option>
+                            <option value="Tubigon">Tubigon</option>
+                            <option value="La Asuncion">La Asuncion</option>
+                            <option value="Dibulang">Dibulang</option>
+                            <option value="Kisanayan">Kisanayan</option>
+                            <option value="Danggawan">Danggawan</option>
+                            <option value="Panalsalan">Panalsalan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Purok / Zone *</label>
+                        <input type="text" id="edit-hh-purok" required placeholder="e.g. Purok 3"
+                            class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Street Address *</label>
+                        <input type="text" id="edit-hh-street" required placeholder="e.g. Sayre Highway"
+                            class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                    </div>
+                </div>
+
+                <!-- Row 3: Income & Vulnerability Tags -->
+                <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700">Monthly Household Income (₱) *</label>
+                            <div class="relative mt-1">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs font-bold">₱</span>
+                                <input type="number" id="edit-hh-income" min="0" step="100" required
+                                    class="block w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                            </div>
+                            <p class="text-[10.5px] text-slate-500 mt-1">Municipal poverty threshold screen is <strong>₱15,000.00</strong>.</p>
+                        </div>
+
+                        <div class="space-y-2 pt-1">
+                            <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="edit-hh-informal" class="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                                <span>Informal Settler / No Land Ownership (+20% Weight)</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="edit-hh-calamity" class="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                                <span>Severe Disaster / Typhoon Calamity Damaged (+20% Weight)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Family Dependents Section -->
+                <div class="space-y-2.5 pt-1">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                        <div class="flex items-center gap-1.5">
+                            <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i>
+                            <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Family Members & Dependents</h4>
+                            <span id="edit-hh-member-count-badge" class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">1 member</span>
+                        </div>
+                        <button type="button" onclick="addHouseholdMemberRow()"
+                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>Add Dependent</span>
+                        </button>
+                    </div>
+
+                    <div id="edit-hh-members-container" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        <!-- Dynamic member rows inserted here -->
+                    </div>
+                </div>
+
+                <!-- Action Footer -->
+                <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <button type="button" onclick="deleteHouseholdRecord()" id="edit-hh-delete-btn"
+                        class="px-3.5 py-2 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Delete Household</span>
+                    </button>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="closeHouseholdModal()"
+                            class="px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200">
+                            Cancel
+                        </button>
+                        <button type="submit" id="edit-hh-save-btn"
+                            class="px-5 py-2 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-1.5">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                            <span>Save & Re-evaluate</span>
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
 <!-- MODAL: MUNICIPAL ANNOUNCEMENTS & SMS BLAST DISPATCH -->
 <!-- ========================================================================= -->
 <div id="broadcast-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">

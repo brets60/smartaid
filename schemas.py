@@ -82,6 +82,17 @@ class HouseholdResponse(BaseModel):
     created_at: datetime
     members: List[HouseholdMemberResponse] = []
 
+class HouseholdUpdate(BaseModel):
+    head_name: Optional[str] = None
+    contact_number: Optional[str] = None
+    barangay: Optional[str] = None
+    purok_zone: Optional[str] = None
+    street_address: Optional[str] = None
+    monthly_income: Optional[float] = Field(default=None, ge=0.0)
+    is_informal_settler: Optional[bool] = None
+    has_calamity_damage: Optional[bool] = None
+    members: Optional[List[HouseholdMemberCreate]] = None
+
 # --- Program & Rules Schemas ---
 class ProgramRuleCreate(BaseModel):
     income_ceiling: float = 15000.0

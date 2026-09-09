@@ -40,7 +40,7 @@ from database import engine, get_db, Base
 from models import User, Household, HouseholdMember, AidProgram, ProgramRule, Allocation, Disbursement, Announcement
 from schemas import (
     Token, UserLogin, UserCreate, UserResponse,
-    HouseholdCreate, HouseholdResponse,
+    HouseholdCreate, HouseholdResponse, HouseholdUpdate,
     AidProgramCreate, AidProgramResponse, ProgramRuleCreate, ProgramRuleUpdate, ProgramRuleResponse,
     AllocationResponse, VerifyScanRequest, DisbursementResponse, BeneficiaryTrackResponse,
     AnnouncementCreate, AnnouncementResponse
@@ -428,6 +428,112 @@ async def reset_households(
     deleted_count = db.query(Household).delete()
     db.commit()
     return {"status": "SUCCESS", "deleted_count": deleted_count, "message": f"Successfully deleted {deleted_count} households and reset all allocations."}
+
+@app.get("/api/v1/households/{household_id}", response_model=HouseholdResponse)
+async def get_household(
+    household_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_worker)
+):
+    household = db.query(Household).filter(Household.id == household_id).first()
+    if not household:
+        raise HTTPException(status_code=404, detail="Household record not found.")
+    return household
+
+@app.put("/api/v1/households/{household_id}", response_model=HouseholdResponse)
+async def update_household(
+    household_id: str,
+    household_update: HouseholdUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_worker)
+):
+    household = db.query(Household).filter(Household.id == household_id).first()
+    if not household:
+        raise HTTPException(status_code=404, detail="Household record not found.")
+
+    if household_update.head_name is not None:
+        household.head_name = household_update.head_name.strip()
+    if household_update.contact_number is not None:
+        household.contact_number = household_update.contact_number.strip()
+    if household_update.barangay is not None:
+        household.barangay = household_update.barangay.strip()
+    if household_update.purok_zone is not None:
+        household.purok_zone = household_update.purok_zone.strip()
+    if household_update.street_address is not None:
+        household.street_address = household_update.street_address.strip()
+    if household_update.monthly_income is not None:
+        household.monthly_income = household_update.monthly_income
+    if household_update.is_informal_settler is not None:
+        household.is_informal_settler = household_update.is_informal_settler
+    if household_update.has_calamity_damage is not None:
+        household.has_calamity_damage = household_update.has_calamity_damage
+
+    # Update members if provided
+    if household_update.members is not None:
+        db.query(HouseholdMember).filter(HouseholdMember.household_id == household.id).delete()
+        
+        pwd_c = 0
+        eld_c = 0
+        for m in household_update.members:
+            if m.is_pwd:
+                pwd_c += 1
+            if m.is_senior:
+                eld_c += 1
+            member = HouseholdMember(
+                household_id=household.id,
+                first_name=m.first_name.strip(),
+                last_name=m.last_name.strip(),
+                relationship_to_head=m.relationship_to_head.strip(),
+                is_pwd=m.is_pwd,
+                is_senior=m.is_senior
+            )
+            db.add(member)
+        
+        household.member_count = len(household_update.members) + 1
+        household.pwd_count = pwd_c
+        household.elderly_count = eld_c
+
+    db.commit()
+    db.refresh(household)
+
+    # Re-evaluate active program allocations automatically
+    active_program = db.query(AidProgram).filter(AidProgram.status == "Active").first()
+    if active_program:
+        try:
+            engine_inst = MCDAEngine(db)
+            engine_inst.evaluate_program(active_program.id)
+        except Exception as e:
+            print(f"Re-evaluation after household update warning: {e}")
+
+    return household
+
+@app.delete("/api/v1/households/{household_id}")
+async def delete_household(
+    household_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    household = db.query(Household).filter(Household.id == household_id).first()
+    if not household:
+        raise HTTPException(status_code=404, detail="Household record not found.")
+
+    allocations = db.query(Allocation).filter(Allocation.household_id == household_id).all()
+    for alloc in allocations:
+        db.query(Disbursement).filter(Disbursement.allocation_id == alloc.id).delete()
+    db.query(Allocation).filter(Allocation.household_id == household_id).delete()
+    db.query(HouseholdMember).filter(HouseholdMember.household_id == household_id).delete()
+    db.delete(household)
+    db.commit()
+
+    active_program = db.query(AidProgram).filter(AidProgram.status == "Active").first()
+    if active_program:
+        try:
+            engine_inst = MCDAEngine(db)
+            engine_inst.evaluate_program(active_program.id)
+        except Exception as e:
+            print(f"Re-evaluation after household delete warning: {e}")
+
+    return {"status": "SUCCESS", "message": f"Household '{household.head_name}' and associated records deleted."}
 
 @app.get("/api/v1/beneficiary/track/{reference_number}", response_model=BeneficiaryTrackResponse)
 async def track_beneficiary(reference_number: str, db: Session = Depends(get_db)):

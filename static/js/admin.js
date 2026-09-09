@@ -157,11 +157,18 @@ function renderAllocationsTable(allocations) {
                 </td>
                 <td class="px-3 py-3">${statusBadge}</td>
                 <td class="px-3 py-3 text-right pr-6">
-                    <button onclick='openXaiDrawer(${JSON.stringify(a).replace(/'/g, "&#39;")})'
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-indigo-600 hover:bg-indigo-50 border border-indigo-200 shadow-2xs transition-all">
-                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
-                        <span>Audit XAI</span>
-                    </button>
+                    <div class="flex items-center justify-end gap-1.5">
+                        <button onclick='openHouseholdModal("${hh.id}")'
+                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-2xs transition-all">
+                            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-slate-500"></i>
+                            <span>View/Edit</span>
+                        </button>
+                        <button onclick='openXaiDrawer(${JSON.stringify(a).replace(/'/g, "&#39;")})'
+                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-indigo-600 hover:bg-indigo-50 border border-indigo-200 shadow-2xs transition-all">
+                            <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                            <span>Audit XAI</span>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -642,5 +649,234 @@ async function confirmResetHouseholds() {
         }
     } catch (e) {
         alert("Network error while resetting households.");
+    }
+}
+
+// ==========================================
+// HOUSEHOLD VIEW & EDIT CONTROLLER
+// ==========================================
+
+let currentEditingHouseholdId = null;
+
+async function openHouseholdModal(householdId) {
+    currentEditingHouseholdId = householdId;
+    const modal = document.getElementById('household-modal');
+    modal.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`/api/v1/households/${householdId}`);
+        if (!res.ok) {
+            alert('Failed to load household details.');
+            closeHouseholdModal();
+            return;
+        }
+        const hh = await res.json();
+        renderHouseholdModal(hh);
+    } catch(err) {
+        alert('Network error while loading household: ' + err.message);
+        closeHouseholdModal();
+    }
+}
+
+function closeHouseholdModal() {
+    document.getElementById('household-modal').classList.add('hidden');
+    currentEditingHouseholdId = null;
+}
+
+function renderHouseholdModal(hh) {
+    document.getElementById('edit-hh-id').value = hh.id;
+    document.getElementById('edit-hh-modal-title').textContent = hh.head_name || 'Household Profile';
+    document.getElementById('edit-hh-ref-badge').textContent = hh.reference_number || '';
+    
+    const trackLink = document.getElementById('edit-hh-track-link');
+    trackLink.href = `/track?ref=${encodeURIComponent(hh.reference_number)}`;
+
+    document.getElementById('edit-hh-head-name').value = hh.head_name || '';
+    document.getElementById('edit-hh-contact').value = hh.contact_number || '';
+    document.getElementById('edit-hh-barangay').value = hh.barangay || 'North Poblacion';
+    document.getElementById('edit-hh-purok').value = hh.purok_zone || '';
+    document.getElementById('edit-hh-street').value = hh.street_address || '';
+    document.getElementById('edit-hh-income').value = hh.monthly_income || 0;
+    document.getElementById('edit-hh-informal').checked = Boolean(hh.is_informal_settler);
+    document.getElementById('edit-hh-calamity').checked = Boolean(hh.has_calamity_damage);
+
+    // Render members
+    const container = document.getElementById('edit-hh-members-container');
+    container.innerHTML = '';
+    const members = hh.members || [];
+    members.forEach(m => addHouseholdMemberRow(m));
+    updateHouseholdMemberCountBadge();
+
+    lucide.createIcons();
+}
+
+function addHouseholdMemberRow(m = null) {
+    const container = document.getElementById('edit-hh-members-container');
+    const row = document.createElement('div');
+    row.className = 'member-row p-2.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2 items-center';
+    
+    const fn = m ? (m.first_name || '') : '';
+    const ln = m ? (m.last_name || '') : '';
+    const rel = m ? (m.relationship_to_head || '') : 'Dependent';
+    const isPwd = m ? Boolean(m.is_pwd) : false;
+    const isSenior = m ? Boolean(m.is_senior) : false;
+
+    row.innerHTML = `
+        <div class="sm:col-span-3">
+            <input type="text" placeholder="First Name" value="${fn}" required
+                class="member-fn w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+        </div>
+        <div class="sm:col-span-3">
+            <input type="text" placeholder="Last Name" value="${ln}" required
+                class="member-ln w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+        </div>
+        <div class="sm:col-span-2">
+            <select class="member-rel w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                <option value="Spouse" ${rel === 'Spouse' ? 'selected' : ''}>Spouse</option>
+                <option value="Son" ${rel === 'Son' ? 'selected' : ''}>Son</option>
+                <option value="Daughter" ${rel === 'Daughter' ? 'selected' : ''}>Daughter</option>
+                <option value="Parent" ${rel === 'Parent' ? 'selected' : ''}>Parent</option>
+                <option value="Sibling" ${rel === 'Sibling' ? 'selected' : ''}>Sibling</option>
+                <option value="Grandchild" ${rel === 'Grandchild' ? 'selected' : ''}>Grandchild</option>
+                <option value="Other" ${!['Spouse','Son','Daughter','Parent','Sibling','Grandchild'].includes(rel) ? 'selected' : ''}>Other</option>
+            </select>
+        </div>
+        <div class="sm:col-span-3 flex items-center gap-3">
+            <label class="flex items-center gap-1 text-[11px] font-semibold text-purple-700 cursor-pointer">
+                <input type="checkbox" class="member-pwd rounded text-purple-600 border-slate-300" ${isPwd ? 'checked' : ''}>
+                <span>PWD</span>
+            </label>
+            <label class="flex items-center gap-1 text-[11px] font-semibold text-blue-700 cursor-pointer">
+                <input type="checkbox" class="member-senior rounded text-blue-600 border-slate-300" ${isSenior ? 'checked' : ''}>
+                <span>Senior</span>
+            </label>
+        </div>
+        <div class="sm:col-span-1 text-right">
+            <button type="button" onclick="removeHouseholdMemberRow(this)" class="p-1 text-slate-400 hover:text-rose-600">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    `;
+
+    container.appendChild(row);
+    updateHouseholdMemberCountBadge();
+    lucide.createIcons();
+}
+
+function removeHouseholdMemberRow(btn) {
+    const row = btn.closest('.member-row');
+    if (row) {
+        row.remove();
+        updateHouseholdMemberCountBadge();
+    }
+}
+
+function updateHouseholdMemberCountBadge() {
+    const rows = document.querySelectorAll('#edit-hh-members-container .member-row');
+    const badge = document.getElementById('edit-hh-member-count-badge');
+    if (badge) {
+        const total = rows.length + 1;
+        badge.textContent = `${total} household member${total > 1 ? 's' : ''}`;
+    }
+}
+
+async function saveHouseholdChanges(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-hh-id').value;
+    if (!id) return;
+
+    const btn = document.getElementById('edit-hh-save-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="animate-spin mr-1">⏳</span> Saving & Re-evaluating...`;
+
+    // Collect members
+    const memberRows = document.querySelectorAll('#edit-hh-members-container .member-row');
+    const members = [];
+    memberRows.forEach(row => {
+        const fn = row.querySelector('.member-fn').value.trim();
+        const ln = row.querySelector('.member-ln').value.trim();
+        const rel = row.querySelector('.member-rel').value;
+        const isPwd = row.querySelector('.member-pwd').checked;
+        const isSenior = row.querySelector('.member-senior').checked;
+        if (fn && ln) {
+            members.push({
+                first_name: fn,
+                last_name: ln,
+                relationship_to_head: rel,
+                is_pwd: isPwd,
+                is_senior: isSenior
+            });
+        }
+    });
+
+    const payload = {
+        head_name: document.getElementById('edit-hh-head-name').value.trim(),
+        contact_number: document.getElementById('edit-hh-contact').value.trim(),
+        barangay: document.getElementById('edit-hh-barangay').value,
+        purok_zone: document.getElementById('edit-hh-purok').value.trim(),
+        street_address: document.getElementById('edit-hh-street').value.trim(),
+        monthly_income: parseFloat(document.getElementById('edit-hh-income').value) || 0,
+        is_informal_settler: document.getElementById('edit-hh-informal').checked,
+        has_calamity_damage: document.getElementById('edit-hh-calamity').checked,
+        members: members
+    };
+
+    try {
+        const res = await fetch(`/api/v1/households/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            closeHouseholdModal();
+            showToast(`Household profile for ${data.head_name} updated & roster re-evaluated!`);
+            if (currentProgramId) {
+                await loadProgramData(currentProgramId);
+            }
+        } else {
+            alert(data.detail || 'Failed to update household.');
+        }
+    } catch(err) {
+        alert('Network error while saving household: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i><span>Save & Re-evaluate</span>`;
+        lucide.createIcons();
+    }
+}
+
+async function deleteHouseholdRecord() {
+    const id = document.getElementById('edit-hh-id').value;
+    const name = document.getElementById('edit-hh-head-name').value;
+    if (!id) return;
+
+    const ok = confirm(`Are you sure you want to permanently delete the household record for "${name}"?\n\nThis will remove their intake registration, family members, and allocation records.`);
+    if (!ok) return;
+
+    const btn = document.getElementById('edit-hh-delete-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="animate-spin mr-1">⏳</span> Deleting...`;
+
+    try {
+        const res = await fetch(`/api/v1/households/${id}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (res.ok) {
+            closeHouseholdModal();
+            showToast(`Household "${name}" deleted and allocation roster updated.`);
+            if (currentProgramId) {
+                await loadProgramData(currentProgramId);
+            }
+        } else {
+            alert(data.detail || 'Failed to delete household.');
+        }
+    } catch(err) {
+        alert('Network error while deleting household: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Delete Household</span>`;
+        lucide.createIcons();
     }
 }
