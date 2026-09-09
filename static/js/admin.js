@@ -449,8 +449,71 @@ function showToast(msg) {
 
 function openBroadcastModal() {
     document.getElementById('broadcast-modal').classList.remove('hidden');
+    loadSmsSettings();
     loadRecentBroadcasts();
     lucide.createIcons();
+}
+
+async function loadSmsSettings() {
+    try {
+        const res = await fetch('/api/v1/settings/sms');
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = document.getElementById('sms-status-badge');
+        const dot = document.getElementById('sms-status-dot');
+        const helper = document.getElementById('sms-status-helper');
+        const input = document.getElementById('sms-api-key-input');
+
+        if (data.is_configured) {
+            badge.textContent = 'Live Gateway Active';
+            badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+            helper.innerHTML = `<span class="text-emerald-700 font-semibold">✓ Semaphore API Key Active:</span> ${data.masked_key}. Live cellular SMS text messages will be delivered to recipient phones.`;
+            input.placeholder = `Configured (${data.masked_key}) - paste new key to change`;
+        } else {
+            badge.textContent = 'Simulation Mode';
+            badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-300';
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+            helper.textContent = 'No Semaphore key detected. SMS is simulated in server logs. Paste key above to send real text messages.';
+        }
+    } catch(err) {
+        console.error('Error loading SMS settings:', err);
+    }
+}
+
+async function saveSmsApiKey() {
+    const input = document.getElementById('sms-api-key-input');
+    const key = input.value.trim();
+    if (!key) {
+        alert('Please paste your Semaphore API Key before saving.');
+        return;
+    }
+
+    const btn = document.getElementById('sms-save-key-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="animate-spin mr-1">⏳</span> Saving...`;
+
+    try {
+        const res = await fetch('/api/v1/settings/sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: key })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            input.value = '';
+            showToast('Semaphore API Key saved! Live SMS mode is now active.');
+            await loadSmsSettings();
+        } else {
+            alert(data.detail || 'Failed to save SMS API Key.');
+        }
+    } catch(err) {
+        alert('Network error while saving SMS API Key.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="key" class="w-3.5 h-3.5"></i><span>Save Key</span>`;
+        lucide.createIcons();
+    }
 }
 
 function closeBroadcastModal() {

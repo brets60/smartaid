@@ -11,6 +11,17 @@ if hasattr(sys.stderr, "reconfigure"):
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
+# Auto-load environment variables from .env if present
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+env_file = os.path.join(BASE_DIR, ".env")
+if os.path.exists(env_file):
+    with open(env_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ[k.strip()] = v.strip()
+
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Form, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -672,6 +683,92 @@ async def generate_qr_image(claim_qr_hash: str):
 # REST API V1: NOTIFICATIONS & SMS BROADCAST
 # ==========================================
 
+def send_semaphore_sms(phone_numbers: List[str], message: str) -> dict:
+    api_key = os.getenv("SEMAPHORE_API_KEY", "").strip()
+    if not api_key:
+        print("\n[SMS GATEWAY STATUS]: No SEMAPHORE_API_KEY detected in .env. Dispatched in simulation mode.")
+        return {"status": "SIMULATED", "message": "Simulated dispatch - paste SEMAPHORE_API_KEY in .env to send real SMS."}
+
+    import urllib.request
+    import urllib.parse
+    import json
+
+    cleaned = []
+    for p in phone_numbers:
+        num = p.replace("-", "").replace(" ", "").replace("+63", "0").strip()
+        if len(num) >= 10:
+            cleaned.append(num)
+
+    if not cleaned:
+        return {"status": "EMPTY", "message": "No valid phone numbers to send."}
+
+    payload = {
+        "apikey": api_key,
+        "number": ",".join(cleaned),
+        "message": f"LGU MARAMAG MSWDO: {message}"
+    }
+
+    try:
+        req = urllib.request.Request(
+            "https://api.semaphore.co/api/v4/messages",
+            data=urllib.parse.urlencode(payload).encode("utf-8"),
+            headers={"User-Agent": "SmartAid-LGU-Maramag"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_json = json.loads(response.read().decode("utf-8"))
+            print(f"\n[SEMAPHORE LIVE SMS SENT] Successfully delivered to {len(cleaned)} mobile numbers!")
+            return {"status": "LIVE_SENT", "response": res_json}
+    except Exception as e:
+        print(f"\n[SEMAPHORE GATEWAY ERROR]: Failed to send live SMS: {e}")
+        return {"status": "GATEWAY_ERROR", "error": str(e)}
+
+@app.get("/api/v1/settings/sms")
+async def get_sms_settings(current_user: User = Depends(require_worker)):
+    key = os.getenv("SEMAPHORE_API_KEY", "")
+    masked = f"{key[:4]}••••••••{key[-4:]}" if len(key) >= 10 else ("Configured" if key else "")
+    return {
+        "is_configured": bool(key),
+        "masked_key": masked,
+        "provider": "Semaphore.co (Globe / Smart / DITO Gateway)"
+    }
+
+@app.post("/api/v1/settings/sms")
+async def save_sms_settings(
+    request: Request,
+    current_user: User = Depends(require_worker)
+):
+    body = await request.json()
+    new_key = body.get("api_key", "").strip()
+    os.environ["SEMAPHORE_API_KEY"] = new_key
+
+    # Save to .env file
+    env_path = os.path.join(BASE_DIR, ".env")
+    lines = []
+    found = False
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+    new_lines = []
+    for line in lines:
+        if line.startswith("SEMAPHORE_API_KEY="):
+            new_lines.append(f"SEMAPHORE_API_KEY={new_key}\n")
+            found = True
+        else:
+            new_lines.append(line)
+
+    if not found:
+        new_lines.append(f"\nSEMAPHORE_API_KEY={new_key}\n")
+
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(new_lines)
+
+    return {
+        "status": "SUCCESS",
+        "is_configured": bool(new_key),
+        "message": "Semaphore SMS API Key saved successfully! Live SMS text messages will now be sent to Philippine mobile phones."
+    }
+
 @app.post("/api/v1/notifications/broadcast", response_model=AnnouncementResponse)
 async def broadcast_notification(
     payload: AnnouncementCreate,
@@ -692,17 +789,19 @@ async def broadcast_notification(
 
     households = query.all()
     recipients_count = len(households)
+    phone_numbers = [h.contact_number for h in households if h.contact_number]
 
-    # Dispatch / Simulate SMS Blast
-    if payload.dispatch_sms and recipients_count > 0:
+    # Dispatch via Semaphore Gateway (Real if key exists, Simulated if no key)
+    if payload.dispatch_sms and phone_numbers:
         print(f"\n[SMS DISPATCH - LGU MARAMAG MSWDO]")
         print(f"Announcement: {payload.title} ({payload.category})")
         print(f"Target Barangay: {payload.target_barangay} | Status: {payload.target_status}")
-        print(f"Sending broadcast to {recipients_count} registered household mobile numbers...")
-        for h in households[:5]:  # Log first 5 sample deliveries
-            print(f"  -> [SMS SENT to {h.contact_number} ({h.head_name} - {h.barangay})]: {payload.message}")
-        if recipients_count > 5:
-            print(f"  -> ... and {recipients_count - 5} more mobile numbers dispatched successfully via SMS Gateway.")
+        print(f"Sending broadcast to {len(phone_numbers)} registered household mobile numbers...")
+        for h in households[:5]:
+            print(f"  -> [Target: {h.contact_number} ({h.head_name} - {h.barangay})]: {payload.message}")
+        
+        # Trigger Semaphore API dispatch
+        send_semaphore_sms(phone_numbers, payload.message)
 
     announcement = Announcement(
         title=payload.title.strip(),
@@ -727,7 +826,6 @@ async def list_notifications(
 ):
     query = db.query(Announcement).order_by(Announcement.created_at.desc())
     if barangay and barangay != "All":
-        # Return both municipal-wide (target_barangay is None) and specific barangay announcements
         query = query.filter((Announcement.target_barangay == None) | (Announcement.target_barangay == barangay))
     
     return query.limit(20).all()
