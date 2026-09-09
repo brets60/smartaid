@@ -402,6 +402,18 @@ async def submit_application(household_in: HouseholdCreate, db: Session = Depend
 
     return household
 
+@app.post("/api/v1/households/reset")
+async def reset_households(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db.query(Disbursement).delete()
+    db.query(Allocation).delete()
+    db.query(HouseholdMember).delete()
+    deleted_count = db.query(Household).delete()
+    db.commit()
+    return {"status": "SUCCESS", "deleted_count": deleted_count, "message": f"Successfully deleted {deleted_count} households and reset all allocations."}
+
 @app.get("/api/v1/beneficiary/track/{reference_number}", response_model=BeneficiaryTrackResponse)
 async def track_beneficiary(reference_number: str, db: Session = Depends(get_db)):
     ref = reference_number.strip().upper()

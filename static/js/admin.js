@@ -522,3 +522,23 @@ async function handleSendBroadcast(e) {
         lucide.createIcons();
     }
 }
+
+async function confirmResetHouseholds() {
+    const ok = confirm("Are you sure you want to clear all applicant households?\n\nThis will remove all applicant records so you can input fresh data. Staff accounts and program criteria will be kept.");
+    if (!ok) return;
+
+    try {
+        const res = await fetch('/api/v1/households/reset', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            showToast("All applicant households cleared successfully. Ready for new intake!");
+            if (currentProgramId) {
+                await loadProgramData(currentProgramId);
+            }
+        } else {
+            alert(data.detail || "Failed to reset households.");
+        }
+    } catch (e) {
+        alert("Network error while resetting households.");
+    }
+}
