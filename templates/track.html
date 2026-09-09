@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+    @media print {
+        header, footer, #track-search-section, #print-action-bar, .no-print {
+            display: none !important;
+        }
+        body, main {
+            background: white !important;
+            padding: 0 !important;
+        }
+        #voucher-card {
+            border: 2px solid #0f172a !important;
+            box-shadow: none !important;
+            page-break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+
+    <!-- Track Search Bar -->
+    <div id="track-search-section" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-md">
+        <h2 class="text-lg font-bold text-slate-900 mb-1">Beneficiary Application Tracker</h2>
+        <p class="text-xs text-slate-500 mb-4">Enter your application reference number to check evaluation status and access your digital claim voucher.</p>
+
+        <form id="track-search-form" onsubmit="lookupReference(event)" class="flex gap-2">
+            <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <i data-lucide="ticket" class="w-4 h-4"></i>
+                </div>
+                <input type="text" id="track-input-ref" value="{{ initial_ref }}" required placeholder="e.g. APP-2026-00101"
+                    class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs font-mono uppercase focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <button type="submit" id="track-search-btn"
+                class="px-5 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Search</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- Results Display Area -->
+    <div id="track-result-area" class="space-y-6">
+        {% if initial_ref %}
+        <div class="text-center py-8 text-slate-400">
+            <span class="animate-spin inline-block mr-2">⏳</span> Loading application status...
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const initialRef = "{{ initial_ref }}";
+        if (initialRef) {
+            fetchTrackingData(initialRef);
+        }
+    });
+
+    async function lookupReference(e) {
+        e.preventDefault();
+        const ref = document.getElementById('track-input-ref').value.trim();
+        if (ref) {
+            fetchTrackingData(ref);
+        }
+    }
+
+    async function fetchTrackingData(ref) {
+        const resultArea = document.getElementById('track-result-area');
+        resultArea.innerHTML = `
+            <div class="text-center py-8 text-slate-400">
+                <span class="animate-spin inline-block mr-2">⏳</span> Checking official registry...
+            </div>
+        `;
+
+        try {
+            const res = await fetch(`/api/v1/beneficiary/track/${encodeURIComponent(ref)}`);
+            const data = await res.json();
+
+            if (!res.ok) {
+                resultArea.innerHTML = `
+                    <div class="p-6 rounded-2xl bg-rose-50 border border-rose-200 text-center space-y-2">
+                        <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+                            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-rose-900">Reference Number Not Found</h3>
+                        <p class="text-xs text-rose-700">${data.detail || 'Please confirm your reference number.'}</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            renderBeneficiaryResult(data);
+
+        } catch (err) {
+            resultArea.innerHTML = `
+                <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                    Failed to communicate with server: ${err.message}
+                </div>
+            `;
+        }
+    }
+
+    function renderBeneficiaryResult(data) {
+        const resultArea = document.getElementById('track-result-area');
+        
+        let statusBadge = '';
+        let mainContent = '';
+
+        if (data.status === 'Approved') {
+            statusBadge = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> APPROVED FOR DISBURSEMENT
+                </span>
+            `;
+
+            const claimStatus = data.is_disbursed ? 
+                `<span class="px-2.5 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-200">CLAIMED on ${new Date(data.disbursed_at).toLocaleDateString()}</span>` :
+                `<span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-600 text-white animate-pulse">READY TO CLAIM</span>`;
+
+            mainContent = `
+                <!-- OFFICIAL DIGITAL CLAIM VOUCHER / PASS -->
+                <div id="voucher-card" class="bg-white rounded-2xl border-2 border-indigo-600 shadow-2xl overflow-hidden">
+                    
+                    <!-- Voucher Top Header -->
+                    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 flex items-center justify-between border-b border-indigo-500/30">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase tracking-wider">
+                                    Official Relief Voucher
+                                </span>
+                                ${claimStatus}
+                            </div>
+                            <h3 class="text-xl font-black mt-1.5 tracking-tight">${data.program_name || 'Emergency Relief Program'}</h3>
+                            <p class="text-xs text-indigo-200 font-medium">Municipal Social Welfare & Relief Office</p>
+                        </div>
+                        <div class="text-right hidden sm:block">
+                            <p class="text-[10px] text-slate-400 font-mono">PRIORITY RANK</p>
+                            <p class="text-2xl font-black text-indigo-400">#${data.rank || '1'}</p>
+                        </div>
+                    </div>
+
+                    <!-- Voucher Body -->
+                    <div class="p-6 sm:p-8 space-y-6">
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 items-center">
+                            <!-- QR Code Stub -->
+                            <div class="text-center sm:border-r border-slate-200 sm:pr-6">
+                                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm inline-block">
+                                    <img src="${data.qr_image_url}" alt="Cryptographic QR Claim Stub" class="w-40 h-40 mx-auto rounded-lg">
+                                </div>
+                                <p class="text-[10px] font-mono text-slate-400 mt-2 break-all">
+                                    ${data.claim_qr_hash ? data.claim_qr_hash.substring(0, 16) + '...' : ''}
+                                </p>
+                                <span class="inline-block mt-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    SHA-256 Verified
+                                </span>
+                            </div>
+
+                            <!-- Beneficiary Details -->
+                            <div class="sm:col-span-2 space-y-3">
+                                <div>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Beneficiary Head</p>
+                                    <h4 class="text-lg font-bold text-slate-900">${data.head_name}</h4>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Reference Number</p>
+                                        <p class="font-mono font-bold text-indigo-600">${data.reference_number}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Registered Contact</p>
+                                        <p class="font-semibold text-slate-700">${data.contact_number}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Barangay & Zone</p>
+                                        <p class="font-semibold text-slate-700">${data.barangay}, ${data.purok_zone}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Assigned Benefit</p>
+                                        <p class="font-bold text-slate-900">₱${data.budget_per_slot ? data.budget_per_slot.toLocaleString() : '5,000'} / Food Pack</p>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                    <div>
+                                        <span class="text-slate-400">Vulnerability Index (VPI):</span>
+                                        <span class="font-mono font-bold text-indigo-600 ml-1">${data.vulnerability_score ? data.vulnerability_score.toFixed(4) : 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-400">Quota Placement:</span>
+                                        <span class="font-semibold text-slate-700 ml-1">#${data.rank} of ${data.total_quota} slots</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Claiming Instructions -->
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+                            <p class="font-bold text-slate-900 flex items-center gap-1.5">
+                                <i data-lucide="info" class="w-4 h-4 text-indigo-600"></i>
+                                Claiming Guidelines at Distribution Post:
+                            </p>
+                            <ul class="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
+                                <li>Present this digital voucher on your smartphone or bring a printed copy.</li>
+                                <li>Present any valid government ID or Barangay Certificate of Residency.</li>
+                                <li>The field worker will scan this QR code to verify and release your aid package.</li>
+                            </ul>
+                        </div>
+
+                    </div>
+
+                    <!-- Print Action Bar -->
+                    <div id="print-action-bar" class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 no-print">
+                        <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-all">
+                            <i data-lucide="printer" class="w-4 h-4"></i>
+                            <span>Print Voucher / Claim Stub</span>
+                        </button>
+                    </div>
+
+                </div>
+            `;
+        } else if (data.status === 'Waitlisted') {
+            statusBadge = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    <i data-lucide="clock" class="w-3.5 h-3.5"></i> PRIORITY WAITLISTED
+                </span>
+            `;
+
+            mainContent = `
+                <div class="bg-white rounded-2xl border border-amber-200 shadow-md p-6 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">${data.head_name}</h3>
+                            <p class="text-xs font-mono text-slate-500">${data.reference_number}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
+                                Priority Rank #${data.rank}
+                            </span>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Your household meets all baseline eligibility criteria with a Vulnerability Priority Index (VPI) of <strong>${data.vulnerability_score ? data.vulnerability_score.toFixed(4) : 'N/A'}</strong>. 
+                        However, the program quota of <strong>${data.total_quota} slots</strong> was filled by higher-priority applicants. You have been placed on the priority waitlist and will be automatically promoted if additional relief allocations become available.
+                    </p>
+                </div>
+            `;
+        } else {
+            statusBadge = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                    <i data-lucide="x-circle" class="w-3.5 h-3.5"></i> NOT ELIGIBLE / DISQUALIFIED
+                </span>
+            `;
+
+            const reason = data.score_breakdown?.eligibility?.disqualification_reason || 
+                           data.score_breakdown?.allocation_decision?.reason || 
+                           'Exceeds program qualification constraints.';
+
+            mainContent = `
+                <div class="bg-white rounded-2xl border border-rose-200 shadow-md p-6 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">${data.head_name}</h3>
+                            <p class="text-xs font-mono text-slate-500">${data.reference_number}</p>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                        <strong>Reason for Disqualification:</strong>
+                        <p class="mt-1">${reason}</p>
+                    </div>
+
+                    <p class="text-xs text-slate-500">
+                        If you believe this determination was made in error or if your socioeconomic circumstances have recently changed, please visit your local Barangay hall or City Social Welfare and Development Office for manual appeal.
+                    </p>
+                </div>
+            `;
+        }
+
+        resultArea.innerHTML = `
+            <div class="flex justify-between items-center">
+                <p class="text-xs font-semibold text-slate-500">Search Result:</p>
+                ${statusBadge}
+            </div>
+            ${mainContent}
+        `;
+        lucide.createIcons();
+    }
+</script>
+{% endblock %}

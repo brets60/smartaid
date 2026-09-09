@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- Header & Action Toolbar -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Social Welfare Operations Command</h1>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    System Online
+                </span>
+            </div>
+            <p class="text-sm text-slate-500 mt-1">
+                Active Program: <strong id="active-program-name-display" class="text-slate-800">{{ active_program.program_name if active_program else 'No Active Program' }}</strong>
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Program Selector -->
+            <select id="program-select" onchange="loadProgramData(this.value)"
+                class="text-xs font-semibold bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                {% for p in programs %}
+                <option value="{{ p.id }}" {% if active_program and p.id == active_program.id %}selected{% endif %}>
+                    {{ p.program_name }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <!-- Weight Sliders Modal Trigger -->
+            <button onclick="openWeightModal()"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm transition-all">
+                <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span>Criteria Weights (MCDA)</span>
+            </button>
+
+            <!-- Re-Evaluate Engine Button -->
+            <button onclick="triggerEvaluation()" id="eval-btn"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20 transition-all">
+                <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                <span>Run MCDA Allocation</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <!-- Metric 1: Program Quota -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Quota Slots</p>
+                <h3 id="stat-quota" class="text-2xl font-extrabold text-slate-900 mt-1">--</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Program capacity limit</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <i data-lucide="users" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Metric 2: Approved Beneficiaries -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved Beneficiaries</p>
+                <h3 id="stat-approved" class="text-2xl font-extrabold text-emerald-600 mt-1">--</h3>
+                <p id="stat-quota-util" class="text-xs text-slate-400 mt-0.5">100% quota filled</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Metric 3: Disbursed Relief Packages -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Disbursed Packages</p>
+                <h3 id="stat-disbursed" class="text-2xl font-extrabold text-indigo-600 mt-1">--</h3>
+                <p id="stat-disbursed-pct" class="text-xs text-slate-400 mt-0.5">Field QR claims</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <i data-lucide="package-check" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Metric 4: Budget Allocation -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Disbursed Budget</p>
+                <h3 id="stat-budget" class="text-2xl font-extrabold text-slate-900 mt-1">₱--</h3>
+                <p id="stat-budget-total" class="text-xs text-slate-400 mt-0.5">of ₱-- total</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <i data-lucide="coins" class="w-5 h-5"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Master Allocation Section -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        
+        <!-- Table Control Toolbar -->
+        <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-slate-900">MCDA Allocation Priority Roster</h2>
+                <p class="text-xs text-slate-500">Deterministic ranking derived from normalized poverty, dependency, and vulnerability vectors.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Search Input -->
+                <div class="relative rounded-lg shadow-sm w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                    </div>
+                    <input type="text" id="table-search" oninput="filterTable()"
+                        class="block w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs placeholder-slate-400 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Filter name, ref, barangay...">
+                </div>
+
+                <!-- Status Filter Pills -->
+                <div class="inline-flex rounded-lg border border-slate-300 p-0.5 bg-slate-100 text-xs font-medium text-slate-600">
+                    <button onclick="setStatusFilter('ALL')" id="filter-ALL" class="px-2.5 py-1 rounded-md bg-white font-semibold text-slate-900 shadow-sm">All</button>
+                    <button onclick="setStatusFilter('Approved')" id="filter-Approved" class="px-2.5 py-1 rounded-md hover:text-slate-900">Approved</button>
+                    <button onclick="setStatusFilter('Waitlisted')" id="filter-Waitlisted" class="px-2.5 py-1 rounded-md hover:text-slate-900">Waitlisted</button>
+                    <button onclick="setStatusFilter('Disqualified')" id="filter-Disqualified" class="px-2.5 py-1 rounded-md hover:text-slate-900">Disqualified</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table View -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <thead class="bg-slate-50 font-semibold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                        <th class="py-3.5 pl-4 pr-3 sm:pl-6">Rank</th>
+                        <th class="px-3 py-3.5">Reference & Beneficiary</th>
+                        <th class="px-3 py-3.5">Barangay & Zone</th>
+                        <th class="px-3 py-3.5">Monthly Income</th>
+                        <th class="px-3 py-3.5">Dependents</th>
+                        <th class="px-3 py-3.5">Flags</th>
+                        <th class="px-3 py-3.5">VPI Score</th>
+                        <th class="px-3 py-3.5">Status</th>
+                        <th class="px-3 py-3.5 text-right pr-6">Explainability</th>
+                    </tr>
+                </thead>
+                <tbody id="allocations-tbody" class="divide-y divide-slate-200 bg-white">
+                    <tr>
+                        <td colspan="9" class="py-12 text-center text-slate-400">
+                            <span class="animate-spin inline-block mr-2">⏳</span> Loading allocations...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: DYNAMIC CRITERIA WEIGHT SLIDER -->
+<!-- ========================================================================= -->
+<div id="weight-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onclick="closeWeightModal()"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                        <i data-lucide="sliders" class="w-4 h-4"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 text-base">Adjust MCDA Criteria Weights</h3>
+                </div>
+                <button onclick="closeWeightModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500 mt-3">
+                Specify relative decision criteria weights. For mathematical consistency, the sum must strictly equal <strong>100%</strong>.
+            </p>
+
+            <form id="weight-form" onsubmit="saveCriteriaWeights(event)" class="mt-5 space-y-4">
+                
+                <!-- Income Weight Slider -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span class="text-slate-700">1. Income Vulnerability Weight ($W_{income}$)</span>
+                        <span id="weight-val-income" class="text-indigo-600 font-mono">35%</span>
+                    </div>
+                    <input type="range" id="slider-income" min="0" max="100" step="1" value="35" oninput="updateSliders('income')"
+                        class="w-full accent-indigo-600 cursor-pointer">
+                    <p class="text-[11px] text-slate-400 mt-0.5">Inversely proportional: lowest income households receive maximum weight.</p>
+                </div>
+
+                <!-- Dependency Weight Slider -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span class="text-slate-700">2. Demographic Dependency Weight ($W_{dependency}$)</span>
+                        <span id="weight-val-dep" class="text-indigo-600 font-mono">25%</span>
+                    </div>
+                    <input type="range" id="slider-dep" min="0" max="100" step="1" value="25" oninput="updateSliders('dep')"
+                        class="w-full accent-indigo-600 cursor-pointer">
+                    <p class="text-[11px] text-slate-400 mt-0.5">Ratio of PWD (1.5x weight) and Elderly (1.0x weight) to total household members.</p>
+                </div>
+
+                <!-- Calamity Damage Weight Slider -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span class="text-slate-700">3. Calamity & Disaster Impact ($W_{calamity}$)</span>
+                        <span id="weight-val-calamity" class="text-indigo-600 font-mono">20%</span>
+                    </div>
+                    <input type="range" id="slider-calamity" min="0" max="100" step="1" value="20" oninput="updateSliders('calamity')"
+                        class="w-full accent-indigo-600 cursor-pointer">
+                    <p class="text-[11px] text-slate-400 mt-0.5">Direct storm, flood, or fire damage impact score.</p>
+                </div>
+
+                <!-- Housing Vulnerability Weight Slider -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span class="text-slate-700">4. Housing Vulnerability ($W_{housing}$)</span>
+                        <span id="weight-val-housing" class="text-indigo-600 font-mono">20%</span>
+                    </div>
+                    <input type="range" id="slider-housing" min="0" max="100" step="1" value="20" oninput="updateSliders('housing')"
+                        class="w-full accent-indigo-600 cursor-pointer">
+                    <p class="text-[11px] text-slate-400 mt-0.5">Informal settlement status and non-permanent residential tenure.</p>
+                </div>
+
+                <!-- Income Ceiling Gate & Cooldown Days -->
+                <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Income Ceiling (₱)</label>
+                        <input type="number" id="input-ceiling" value="15000" min="1000" step="500" required
+                            class="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Cooldown Period (Days)</label>
+                        <input type="number" id="input-cooldown" value="14" min="0" max="365" required
+                            class="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono">
+                    </div>
+                </div>
+
+                <!-- Total Weight Sum Indicator -->
+                <div class="p-3 rounded-lg flex items-center justify-between border" id="weight-sum-box">
+                    <span class="text-xs font-semibold">Total Weight Sum:</span>
+                    <span id="weight-sum-val" class="font-mono font-bold text-sm">100%</span>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3">
+                    <button type="button" onclick="autoBalanceWeights()"
+                        class="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200">
+                        Auto-Balance
+                    </button>
+                    <button type="submit" id="save-weights-btn"
+                        class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm">
+                        Save Rules & Re-evaluate
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- SLIDE-OVER DRAWER: EXPLAINABLE AI (XAI) TRANSPARENT POINT BREAKDOWN -->
+<!-- ========================================================================= -->
+<div id="xai-drawer" class="fixed inset-0 z-50 overflow-hidden hidden">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeXaiDrawer()"></div>
+    <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
+        <div class="w-screen max-w-md bg-white shadow-2xl border-l border-slate-200 flex flex-col">
+            
+            <!-- Drawer Header -->
+            <div class="p-6 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-300 text-[10px] font-mono border border-indigo-400/30 uppercase">
+                            XAI Transparency Audit
+                        </span>
+                    </div>
+                    <h3 class="text-lg font-bold mt-1" id="xai-head-name">Applicant Name</h3>
+                    <p class="text-xs text-slate-400 font-mono" id="xai-ref-num">APP-2026-XXXXX</p>
+                </div>
+                <button onclick="closeXaiDrawer()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Drawer Body -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                
+                <!-- Decision Badge & VPI -->
+                <div class="p-4 rounded-xl border bg-slate-50 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-semibold uppercase">Vulnerability Priority Index</p>
+                        <div class="flex items-baseline gap-2 mt-0.5">
+                            <span id="xai-vpi-score" class="text-3xl font-extrabold text-indigo-600 font-mono">0.0000</span>
+                            <span class="text-xs text-slate-400">/ 1.0000</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span id="xai-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                            Approved
+                        </span>
+                        <p id="xai-rank-display" class="text-xs font-semibold text-slate-700 mt-1">Rank #1</p>
+                    </div>
+                </div>
+
+                <!-- Hard Constraint Screening Log -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="shield-check" class="w-4 h-4 text-indigo-600"></i>
+                        Hard Constraint Screening
+                    </h4>
+                    <div id="xai-hard-checks" class="p-3.5 rounded-lg border border-slate-200 bg-white space-y-2 text-xs">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+
+                <!-- Factor Breakdown Progress Bars -->
+                <div class="space-y-4">
+                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i>
+                        MCDA Factor Contributions
+                    </h4>
+
+                    <!-- 1. Income Factor -->
+                    <div class="p-3 rounded-lg border border-slate-200 bg-white space-y-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-slate-700">Income Vulnerability</span>
+                            <span id="xai-income-contrib" class="font-mono font-bold text-indigo-600">+0.0000</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div id="xai-income-bar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="xai-income-desc" class="text-[11px] text-slate-500">₱0.00 / ₱15,000 ceiling (S_income = 1.00)</p>
+                    </div>
+
+                    <!-- 2. Dependency Factor -->
+                    <div class="p-3 rounded-lg border border-slate-200 bg-white space-y-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-slate-700">Demographic Dependency</span>
+                            <span id="xai-dep-contrib" class="font-mono font-bold text-indigo-600">+0.0000</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div id="xai-dep-bar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="xai-dep-desc" class="text-[11px] text-slate-500">1 PWD, 1 Elderly out of 5 members</p>
+                    </div>
+
+                    <!-- 3. Calamity Damage Factor -->
+                    <div class="p-3 rounded-lg border border-slate-200 bg-white space-y-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-slate-700">Disaster & Storm Damage</span>
+                            <span id="xai-calamity-contrib" class="font-mono font-bold text-indigo-600">+0.0000</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div id="xai-calamity-bar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="xai-calamity-desc" class="text-[11px] text-slate-500">Reported severe damage</p>
+                    </div>
+
+                    <!-- 4. Housing Vulnerability Factor -->
+                    <div class="p-3 rounded-lg border border-slate-200 bg-white space-y-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-slate-700">Housing Vulnerability</span>
+                            <span id="xai-housing-contrib" class="font-mono font-bold text-indigo-600">+0.0000</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div id="xai-housing-bar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="xai-housing-desc" class="text-[11px] text-slate-500">Informal settler settlement</p>
+                    </div>
+                </div>
+
+                <!-- Allocation Decision Rationale -->
+                <div class="p-4 rounded-xl border border-indigo-100 bg-indigo-50/50 space-y-1">
+                    <p class="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Algorithm Allocation Rationale</p>
+                    <p id="xai-decision-rationale" class="text-xs text-indigo-800 leading-relaxed">
+                        Ranked #1 within program quota limit. Tie-breaking rules and hard screening passed.
+                    </p>
+                </div>
+
+            </div>
+            
+            <!-- Drawer Footer -->
+            <div class="p-4 border-t border-slate-200 bg-slate-50 text-right">
+                <button onclick="closeXaiDrawer()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-white hover:bg-slate-700">
+                    Close Audit View
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/admin.js"></script>
+{% endblock %}

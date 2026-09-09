@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: smartaid-web
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python seed.py && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartaid-postgres
+          property: connectionString
+      - key: SMARTAID_SECRET_KEY
+        generateValue: true
+
+databases:
+  - name: smartaid-postgres
+    databaseName: smartaid
+    user: smartaid_user
+    plan: free

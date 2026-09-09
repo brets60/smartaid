@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- HTML5 QR Code Reader CDN -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<style>
+    #reader {
+        width: 100%;
+        border-radius: 1rem;
+        overflow: hidden;
+    }
+    #reader video {
+        border-radius: 1rem;
+        object-fit: cover;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Header -->
+    <div class="text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold mb-2">
+            <i data-lucide="scan" class="w-3.5 h-3.5"></i>
+            Field Agent Station
+        </div>
+        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Cryptographic QR Disbursement Scanner</h1>
+        <p class="text-xs text-slate-500 mt-1">
+            Scan beneficiary voucher tokens or enter claim hashes to verify eligibility and prevent double disbursements.
+        </p>
+    </div>
+
+    <!-- SCANNER CONTAINER -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden p-6 space-y-5">
+        
+        <!-- Live Camera Viewfinder Box -->
+        <div class="relative bg-slate-950 rounded-2xl overflow-hidden min-h-[260px] flex flex-col items-center justify-center p-2 text-white">
+            <div id="reader" class="w-full"></div>
+            
+            <div id="camera-idle-placeholder" class="py-12 text-center space-y-3">
+                <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-indigo-400">
+                    <i data-lucide="camera" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-slate-200">Camera Viewfinder Idle</p>
+                    <p class="text-xs text-slate-400">Click below to start live video barcode scanning</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scanner Camera Controls -->
+        <div class="flex items-center justify-center gap-3">
+            <button type="button" id="start-scan-btn" onclick="startScanner()"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all">
+                <i data-lucide="video" class="w-4 h-4"></i>
+                <span>Start Camera Scanner</span>
+            </button>
+            <button type="button" id="stop-scan-btn" onclick="stopScanner()" class="hidden inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-white shadow-md transition-all">
+                <i data-lucide="video-off" class="w-4 h-4"></i>
+                <span>Stop Camera</span>
+            </button>
+        </div>
+
+        <!-- Manual Token / Ref Hash Input Fallback -->
+        <div class="pt-4 border-t border-slate-100">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">Manual Voucher Verification Fallback</p>
+            <form onsubmit="handleManualVerify(event)" class="flex gap-2">
+                <input type="text" id="manual-token-input" placeholder="Enter Reference (e.g. APP-2026-00101) or SHA-256 Hash"
+                    class="flex-1 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-indigo-500 focus:border-indigo-500">
+                <button type="submit"
+                    class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-1.5 shadow-sm">
+                    <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                    <span>Verify</span>
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- DYNAMIC STATUS RESPONSE CONTAINER -->
+    <div id="scan-result-container" class="space-y-4">
+        <!-- Injected via scanner.js (Green Valid, Red Already Claimed, Red Invalid) -->
+    </div>
+
+</div>
+
+<script src="/static/js/scanner.js"></script>
+{% endblock %}
