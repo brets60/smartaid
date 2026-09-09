@@ -442,3 +442,83 @@ function showToast(msg) {
     lucide.createIcons();
     setTimeout(() => toast.remove(), 4000);
 }
+
+// ==========================================
+// MUNICIPAL ANNOUNCEMENTS & SMS DISPATCH
+// ==========================================
+
+function openBroadcastModal() {
+    document.getElementById('broadcast-modal').classList.remove('hidden');
+    loadRecentBroadcasts();
+    lucide.createIcons();
+}
+
+function closeBroadcastModal() {
+    document.getElementById('broadcast-modal').classList.add('hidden');
+}
+
+async function loadRecentBroadcasts() {
+    const list = document.getElementById('recent-broadcasts-list');
+    try {
+        const res = await fetch('/api/v1/notifications');
+        const items = await res.json();
+        if (items && items.length > 0) {
+            list.innerHTML = items.map(n => `
+                <div class="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-800">${n.title}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">${n.category}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-600 line-clamp-2">${n.message}</p>
+                    <div class="flex justify-between text-[10px] text-slate-400 pt-0.5">
+                        <span>Target: ${n.target_barangay || 'All Barangays'} (${n.recipients_count} recipients)</span>
+                        <span>${new Date(n.created_at).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            list.innerHTML = `<p class="text-slate-400 text-center py-2">No broadcast announcements dispatched yet.</p>`;
+        }
+    } catch(e) {
+        list.innerHTML = `<p class="text-rose-400 text-center py-2">Failed to load dispatch history.</p>`;
+    }
+}
+
+async function handleSendBroadcast(e) {
+    e.preventDefault();
+    const btn = document.getElementById('broadcast-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="animate-spin mr-1">⏳</span> Dispatching SMS...`;
+
+    const payload = {
+        title: document.getElementById('broadcast-title').value.trim(),
+        category: document.getElementById('broadcast-category').value,
+        target_barangay: document.getElementById('broadcast-barangay').value,
+        target_status: document.getElementById('broadcast-status').value,
+        message: document.getElementById('broadcast-message').value.trim(),
+        dispatch_sms: document.getElementById('broadcast-dispatch-sms').checked
+    };
+
+    try {
+        const res = await fetch('/api/v1/notifications/broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById('broadcast-form').reset();
+            closeBroadcastModal();
+            showToast(`Broadcast dispatched! ${data.recipients_count} household mobile numbers notified.`);
+        } else {
+            alert(data.detail || 'Failed to dispatch broadcast.');
+        }
+    } catch (err) {
+        alert('Network error while dispatching broadcast.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="send" class="w-3.5 h-3.5"></i><span>Send Broadcast Now</span>`;
+        lucide.createIcons();
+    }
+}

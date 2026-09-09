@@ -22,12 +22,13 @@ import qrcode
 from PIL import Image
 
 from database import engine, get_db, Base
-from models import User, Household, HouseholdMember, AidProgram, ProgramRule, Allocation, Disbursement
+from models import User, Household, HouseholdMember, AidProgram, ProgramRule, Allocation, Disbursement, Announcement
 from schemas import (
     Token, UserLogin, UserCreate, UserResponse,
     HouseholdCreate, HouseholdResponse,
     AidProgramCreate, AidProgramResponse, ProgramRuleCreate, ProgramRuleUpdate, ProgramRuleResponse,
-    AllocationResponse, VerifyScanRequest, DisbursementResponse, BeneficiaryTrackResponse
+    AllocationResponse, VerifyScanRequest, DisbursementResponse, BeneficiaryTrackResponse,
+    AnnouncementCreate, AnnouncementResponse
 )
 from auth import (
     verify_password, get_password_hash, create_access_token,
@@ -656,8 +657,68 @@ async def generate_qr_image(claim_qr_hash: str):
     return StreamingResponse(buf, media_type="image/png")
 
 # ==========================================
-# RUN SCRIPT ENTRYPOINT
+# REST API V1: NOTIFICATIONS & SMS BROADCAST
 # ==========================================
+
+@app.post("/api/v1/notifications/broadcast", response_model=AnnouncementResponse)
+async def broadcast_notification(
+    payload: AnnouncementCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_worker)
+):
+    query = db.query(Household)
+
+    # Filter by Barangay
+    if payload.target_barangay and payload.target_barangay != "All":
+        query = query.filter(Household.barangay == payload.target_barangay)
+
+    # Filter by Allocation Status if specified
+    if payload.target_status and payload.target_status != "All":
+        query = query.join(Allocation, Household.id == Allocation.household_id).filter(
+            Allocation.status == payload.target_status
+        )
+
+    households = query.all()
+    recipients_count = len(households)
+
+    # Dispatch / Simulate SMS Blast
+    if payload.dispatch_sms and recipients_count > 0:
+        print(f"\n[SMS DISPATCH - LGU MARAMAG MSWDO]")
+        print(f"Announcement: {payload.title} ({payload.category})")
+        print(f"Target Barangay: {payload.target_barangay} | Status: {payload.target_status}")
+        print(f"Sending broadcast to {recipients_count} registered household mobile numbers...")
+        for h in households[:5]:  # Log first 5 sample deliveries
+            print(f"  -> [SMS SENT to {h.contact_number} ({h.head_name} - {h.barangay})]: {payload.message}")
+        if recipients_count > 5:
+            print(f"  -> ... and {recipients_count - 5} more mobile numbers dispatched successfully via SMS Gateway.")
+
+    announcement = Announcement(
+        title=payload.title.strip(),
+        category=payload.category.strip(),
+        target_barangay=payload.target_barangay if payload.target_barangay != "All" else None,
+        target_status=payload.target_status if payload.target_status != "All" else None,
+        message=payload.message.strip(),
+        sms_dispatched=payload.dispatch_sms,
+        recipients_count=recipients_count,
+        created_at=datetime.now(timezone.utc)
+    )
+    db.add(announcement)
+    db.commit()
+    db.refresh(announcement)
+
+    return announcement
+
+@app.get("/api/v1/notifications", response_model=List[AnnouncementResponse])
+async def list_notifications(
+    barangay: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(Announcement).order_by(Announcement.created_at.desc())
+    if barangay and barangay != "All":
+        # Return both municipal-wide (target_barangay is None) and specific barangay announcements
+        query = query.filter((Announcement.target_barangay == None) | (Announcement.target_barangay == barangay))
+    
+    return query.limit(20).all()
 
 if __name__ == "__main__":
     import uvicorn

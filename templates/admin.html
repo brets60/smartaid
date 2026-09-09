@@ -28,11 +28,18 @@
                 {% endfor %}
             </select>
 
-            <!-- Weight Sliders Modal Trigger -->
+            <!-- Criteria Weights Modal Trigger -->
             <button onclick="openWeightModal()"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm transition-all">
                 <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-600"></i>
                 <span>Criteria Weights (MCDA)</span>
+            </button>
+
+            <!-- Broadcast SMS & Notices Button -->
+            <button onclick="openBroadcastModal()"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all">
+                <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
+                <span>Broadcast SMS & Notices</span>
             </button>
 
             <!-- Re-Evaluate Engine Button -->
@@ -154,6 +161,125 @@
 
     </div>
 
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: MUNICIPAL ANNOUNCEMENTS & SMS BLAST DISPATCH -->
+<!-- ========================================================================= -->
+<div id="broadcast-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onclick="closeBroadcastModal()"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                        <i data-lucide="megaphone" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Municipal Announcements & SMS Blast</h3>
+                        <p class="text-[11px] text-slate-500">LGU Maramag MSWDO Beneficiary Notification Dispatcher</p>
+                    </div>
+                </div>
+                <button onclick="closeBroadcastModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="broadcast-form" onsubmit="handleSendBroadcast(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700">Announcement Title *</label>
+                    <input type="text" id="broadcast-title" required placeholder="e.g. Relief Food Pack Distribution Schedule - Base Camp"
+                        class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Category *</label>
+                        <select id="broadcast-category" required
+                            class="mt-1 block w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                            <option value="Relief Goods Distribution">🍞 Relief Goods Distribution</option>
+                            <option value="Scholarship & Education">🎓 Scholarship & Education</option>
+                            <option value="Calamity & Disaster Alert">⛈️ Calamity Alert (Pulangi)</option>
+                            <option value="General Welfare Notice">📢 General Welfare Notice</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Target Barangay</label>
+                        <select id="broadcast-barangay"
+                            class="mt-1 block w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                            <option value="All">All 20 Barangays (Municipality-Wide)</option>
+                            <option value="North Poblacion">North Poblacion</option>
+                            <option value="South Poblacion">South Poblacion</option>
+                            <option value="Base Camp">Base Camp</option>
+                            <option value="Dologon">Dologon</option>
+                            <option value="Musuan">Musuan</option>
+                            <option value="Camp 1">Camp 1</option>
+                            <option value="Panadtalan">Panadtalan</option>
+                            <option value="Dagumbaan">Dagumbaan</option>
+                            <option value="Kuya">Kuya</option>
+                            <option value="San Miguel">San Miguel</option>
+                            <option value="San Roque">San Roque</option>
+                            <option value="Colambugon">Colambugon</option>
+                            <option value="Anahawon">Anahawon</option>
+                            <option value="Bayabason">Bayabason</option>
+                            <option value="Tubigon">Tubigon</option>
+                            <option value="La Asuncion">La Asuncion</option>
+                            <option value="Dibulang">Dibulang</option>
+                            <option value="Kisanayan">Kisanayan</option>
+                            <option value="Danggawan">Danggawan</option>
+                            <option value="Panalsalan">Panalsalan</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">Target Beneficiaries</label>
+                        <select id="broadcast-status"
+                            class="mt-1 block w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                            <option value="All">All Registered Households</option>
+                            <option value="Approved">Approved Applicants Only</option>
+                            <option value="Waitlisted">Waitlisted Applicants</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700">Message Content (SMS & Public Tracker) *</label>
+                    <textarea id="broadcast-message" rows="3" required placeholder="LGU MARAMAG MSWDO ADVISORY: Relief distribution for approved beneficiaries in Brgy. Base Camp will take place on Friday, 9:00 AM at the Barangay Gymnasium. Please bring your QR Voucher or Reference Number and 1 valid ID."
+                        class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                    <p class="text-[11px] text-slate-400 mt-1">This announcement will be published to the beneficiary status portal and dispatched via SMS.</p>
+                </div>
+
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="broadcast-dispatch-sms" checked class="rounded text-emerald-600 focus:ring-emerald-500 border-slate-300">
+                        <span>Dispatch SMS text blast to registered contact numbers</span>
+                    </label>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">SMS Gateway Active</span>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeBroadcastModal()" class="px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200">
+                        Cancel
+                    </button>
+                    <button type="submit" id="broadcast-submit-btn" class="px-5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                        <span>Send Broadcast Now</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Past Broadcasts History -->
+            <div class="pt-4 border-t border-slate-100">
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Recent Municipal Dispatches</h4>
+                <div id="recent-broadcasts-list" class="space-y-2 max-h-40 overflow-y-auto text-xs text-slate-600">
+                    <p class="text-slate-400 text-center py-2">Loading recent announcements...</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
 
 <!-- ========================================================================= -->

@@ -125,3 +125,16 @@ class Disbursement(Base):
 
     allocation = relationship("Allocation", back_populates="disbursement")
     verified_by = relationship("User", back_populates="disbursements")
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    title = Column(String(255), nullable=False)
+    category = Column(String(100), nullable=False)  # 'Relief Distribution', 'Scholarship / Education', 'Disaster Alert', 'General Notice'
+    target_barangay = Column(String(100), nullable=True)  # Null or "All" for municipal-wide
+    target_status = Column(String(50), nullable=True, default="All")  # 'All', 'Approved', 'Waitlisted'
+    message = Column(Text, nullable=False)
+    sms_dispatched = Column(Boolean, default=False, nullable=False)
+    recipients_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)

@@ -292,8 +292,45 @@
                 ${statusBadge}
             </div>
             ${mainContent}
+            <div id="beneficiary-announcements-card" class="mt-6"></div>
         `;
         lucide.createIcons();
+
+        // Load municipal announcements relevant to this beneficiary's barangay
+        loadBeneficiaryAnnouncements(data.barangay);
+    }
+
+    async function loadBeneficiaryAnnouncements(barangay) {
+        const card = document.getElementById('beneficiary-announcements-card');
+        if (!card) return;
+
+        try {
+            const res = await fetch(`/api/v1/notifications?barangay=${encodeURIComponent(barangay || 'All')}`);
+            const items = await res.json();
+            if (items && items.length > 0) {
+                card.innerHTML = `
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-3 no-print">
+                        <div class="flex items-center gap-2 text-slate-900 border-b border-slate-100 pb-2.5">
+                            <i data-lucide="bell-ring" class="w-4 h-4 text-emerald-600"></i>
+                            <h4 class="text-sm font-bold uppercase tracking-wider">Official Announcements for ${barangay || 'Maramag'}</h4>
+                        </div>
+                        <div class="space-y-2.5 pt-1">
+                            ${items.map(n => `
+                                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-xs text-slate-900">${n.title}</span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">${n.category}</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 leading-relaxed">${n.message}</p>
+                                    <p class="text-[10px] text-slate-400 font-medium pt-1">Posted by MSWDO Maramag • ${new Date(n.created_at).toLocaleDateString()}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        } catch(e) {}
     }
 </script>
 {% endblock %}

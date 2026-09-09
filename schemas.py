@@ -182,3 +182,24 @@ class BeneficiaryTrackResponse(BaseModel):
     disbursed_at: Optional[datetime] = None
     budget_per_slot: Optional[float] = None
     qr_image_url: Optional[str] = None
+
+# --- Announcement & Notification Schemas ---
+class AnnouncementCreate(BaseModel):
+    title: str
+    category: str = "Relief Distribution"  # 'Relief Distribution', 'Scholarship / Education', 'Disaster Alert', 'General Notice'
+    target_barangay: Optional[str] = "All"
+    target_status: Optional[str] = "All"  # 'All', 'Approved', 'Waitlisted'
+    message: str
+    dispatch_sms: bool = True
+
+class AnnouncementResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    title: str
+    category: str
+    target_barangay: Optional[str] = None
+    target_status: Optional[str] = None
+    message: str
+    sms_dispatched: bool
+    recipients_count: int
+    created_at: datetime
