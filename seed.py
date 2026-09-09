@@ -56,9 +56,9 @@ def seed_database():
         program = db.query(AidProgram).first()
         if not program:
             program = AidProgram(
-                program_name="Typhoon Kristine Emergency Livelihood & Food Relief 2026",
-                description="Targeted municipal disaster relief package providing essential food packs and emergency subsistence assistance for low-income and calamity-stricken families.",
-                target_barangay=None,  # Open to all municipal barangays
+                program_name="Municipality of Maramag Disaster Relief & Social Assistance Program 2026",
+                description="Official targeted emergency relief assistance and basic subsistence food pack distribution for vulnerable and calamity-affected families across the 20 barangays of Maramag, Province of Bukidnon.",
+                target_barangay=None,  # Open to all 20 Maramag barangays
                 total_quota_slots=10,
                 budget_per_slot=5000.0,
                 status="Active"
