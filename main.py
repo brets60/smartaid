@@ -3,6 +3,10 @@ import os
 import sys
 import random
 import string
+import json
+import urllib.request
+import urllib.parse
+import urllib.error
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -717,19 +721,42 @@ def send_semaphore_sms(phone_numbers: List[str], message: str) -> dict:
         with urllib.request.urlopen(req, timeout=10) as response:
             res_json = json.loads(response.read().decode("utf-8"))
             print(f"\n[SEMAPHORE LIVE SMS SENT] Successfully delivered to {len(cleaned)} mobile numbers!")
-            return {"status": "LIVE_SENT", "response": res_json}
+            return {"status": "LIVE_SENT", "count": len(cleaned), "response": res_json}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore").strip()
+        print(f"\n[SEMAPHORE GATEWAY ERROR HTTP {e.code}]: {err_body}")
+        return {"status": "GATEWAY_ERROR", "code": e.code, "error": err_body}
     except Exception as e:
         print(f"\n[SEMAPHORE GATEWAY ERROR]: Failed to send live SMS: {e}")
         return {"status": "GATEWAY_ERROR", "error": str(e)}
 
 @app.get("/api/v1/settings/sms")
 async def get_sms_settings(current_user: User = Depends(require_worker)):
-    key = os.getenv("SEMAPHORE_API_KEY", "")
+    key = os.getenv("SEMAPHORE_API_KEY", "").strip()
     masked = f"{key[:4]}••••••••{key[-4:]}" if len(key) >= 10 else ("Configured" if key else "")
+    account_info = None
+    account_error = None
+
+    if key:
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                f"https://api.semaphore.co/api/v4/account?apikey={key}",
+                headers={"User-Agent": "SmartAid-LGU-Maramag"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                account_info = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            account_error = e.read().decode("utf-8", errors="ignore").strip()
+        except Exception as e:
+            account_error = str(e)
+
     return {
         "is_configured": bool(key),
         "masked_key": masked,
-        "provider": "Semaphore.co (Globe / Smart / DITO Gateway)"
+        "provider": "Semaphore.co (Globe / Smart / DITO Gateway)",
+        "account": account_info,
+        "error": account_error
     }
 
 @app.post("/api/v1/settings/sms")
@@ -792,6 +819,7 @@ async def broadcast_notification(
     phone_numbers = [h.contact_number for h in households if h.contact_number]
 
     # Dispatch via Semaphore Gateway (Real if key exists, Simulated if no key)
+    sms_result = None
     if payload.dispatch_sms and phone_numbers:
         print(f"\n[SMS DISPATCH - LGU MARAMAG MSWDO]")
         print(f"Announcement: {payload.title} ({payload.category})")
@@ -801,7 +829,7 @@ async def broadcast_notification(
             print(f"  -> [Target: {h.contact_number} ({h.head_name} - {h.barangay})]: {payload.message}")
         
         # Trigger Semaphore API dispatch
-        send_semaphore_sms(phone_numbers, payload.message)
+        sms_result = send_semaphore_sms(phone_numbers, payload.message)
 
     announcement = Announcement(
         title=payload.title.strip(),
@@ -817,7 +845,10 @@ async def broadcast_notification(
     db.commit()
     db.refresh(announcement)
 
-    return announcement
+    # Attach sms_result for API response
+    response_data = AnnouncementResponse.model_validate(announcement)
+    response_data.sms_result = sms_result
+    return response_data
 
 @app.get("/api/v1/notifications", response_model=List[AnnouncementResponse])
 async def list_notifications(

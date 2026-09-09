@@ -465,17 +465,49 @@ async function loadSmsSettings() {
         const input = document.getElementById('sms-api-key-input');
 
         if (data.is_configured) {
-            badge.textContent = 'Live Gateway Active';
-            badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
-            helper.innerHTML = `<span class="text-emerald-700 font-semibold">✓ Semaphore API Key Active:</span> ${data.masked_key}. Live cellular SMS text messages will be delivered to recipient phones.`;
             input.placeholder = `Configured (${data.masked_key}) - paste new key to change`;
+
+            if (data.account) {
+                const acc = data.account;
+                if (acc.status === 'Active' && acc.credit_balance > 0) {
+                    badge.textContent = `Live Ready (${acc.credit_balance} Credits)`;
+                    badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+                    dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+                    helper.innerHTML = `<span class="text-emerald-700 font-semibold">✓ Connected to Semaphore:</span> "${acc.account_name}" (${acc.credit_balance} SMS credits available). Live cellular SMS text messages will be delivered to phones.`;
+                } else {
+                    badge.textContent = `Pending Approval (${acc.credit_balance} Credits)`;
+                    badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-300';
+                    dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+                    helper.innerHTML = `
+                        <div class="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] space-y-1">
+                            <div class="font-bold flex items-center gap-1.5">
+                                <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-600"></i>
+                                <span>Semaphore Account: "${acc.account_name}" (Status: ${acc.status} • ${acc.credit_balance} Credits)</span>
+                            </div>
+                            <p class="leading-normal text-slate-600">
+                                <strong>Why no SMS arrived:</strong> Semaphore newly registered accounts are in <em>Pending</em> status with <em>0 credits</em> until email verification or first top-up. Please check your email inbox to click the verification link from Semaphore, or log in to <a href="https://semaphore.co" target="_blank" class="text-indigo-600 underline font-semibold">semaphore.co</a>.
+                            </p>
+                        </div>
+                    `;
+                }
+            } else if (data.error) {
+                badge.textContent = 'API Key Error';
+                badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-800 border border-rose-300';
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+                helper.innerHTML = `<span class="text-rose-600 font-semibold">API Error:</span> ${data.error}`;
+            } else {
+                badge.textContent = 'Live Gateway Active';
+                badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+                helper.innerHTML = `<span class="text-emerald-700 font-semibold">✓ Semaphore API Key Active:</span> ${data.masked_key}.`;
+            }
         } else {
             badge.textContent = 'Simulation Mode';
             badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-300';
             dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
             helper.textContent = 'No Semaphore key detected. SMS is simulated in server logs. Paste key above to send real text messages.';
         }
+        lucide.createIcons();
     } catch(err) {
         console.error('Error loading SMS settings:', err);
     }
@@ -573,7 +605,14 @@ async function handleSendBroadcast(e) {
         if (res.ok) {
             document.getElementById('broadcast-form').reset();
             closeBroadcastModal();
-            showToast(`Broadcast dispatched! ${data.recipients_count} household mobile numbers notified.`);
+
+            if (data.sms_result && data.sms_result.status === 'GATEWAY_ERROR') {
+                alert(`⚠️ ANNOUNCEMENT SAVED, BUT PHYSICAL SMS COULD NOT BE SENT:\n\n${data.sms_result.error}\n\nReason: Your Semaphore account is currently in 'Pending' status with 0 credits. Please check your email inbox to confirm your Semaphore account or top-up on semaphore.co to enable live cellular SMS.`);
+            } else if (data.sms_result && data.sms_result.status === 'LIVE_SENT') {
+                showToast(`✓ Live SMS successfully delivered to ${data.sms_result.count} mobile numbers!`);
+            } else {
+                showToast(`Broadcast published to ${data.recipients_count} household portals.`);
+            }
         } else {
             alert(data.detail || 'Failed to dispatch broadcast.');
         }

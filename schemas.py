@@ -203,3 +203,4 @@ class AnnouncementResponse(BaseModel):
     sms_dispatched: bool
     recipients_count: int
     created_at: datetime
+    sms_result: Optional[Dict[str, Any]] = None
