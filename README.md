@@ -48,6 +48,48 @@ SmartAid resolves the challenge of allocating limited social aid (food packs, em
 
 ---
 
+## Project Structure & Architecture
+
+```text
+📁 smartaid/
+├── 📁 templates/                 # HTML Web Views (Jinja2 Templates)
+│   ├── base.html                 # Master layout & high-contrast navigation bar
+│   ├── login.html                # Unified Staff & Beneficiary Portal
+│   ├── apply.html                # Public Beneficiary Intake Application
+│   ├── track.html                # Status Tracker & Holographic Voucher Pass
+│   ├── scanner.html              # Field Agent Optical QR Camera Scanner
+│   └── admin.html                # Operations Command & 20 Barangay Workstations
+├── 📁 static/                    # Frontend Assets & Logic
+│   ├── 📁 css/
+│   │   └── style.css             # Design system, animations & glassmorphism
+│   ├── 📁 js/
+│   │   ├── admin.js              # Operations dashboard & XAI audit controller
+│   │   ├── apply.js              # Dynamic multi-step intake controller
+│   │   └── scanner.js            # Barcode video scanner & claim verification
+│   └── 📁 img/                   # Civic landmarks & graphics
+├── 📁 tests/                     # Automated Test Suites
+│   ├── test_api.py               # Complete REST API & view integration tests
+│   └── test_smartaid.py          # Deterministic MCDA mathematical unit tests
+├── 📁 scripts/                   # Database Utilities & Migration Scripts
+│   ├── seed_barangays.py         # 20 Barangay staff account generator
+│   ├── clear_households.py       # Applicant reset & purge utility
+│   └── update_maramag.py         # Address & demographic normalizer
+├── 📁 .vscode/                   # Visual Studio Code Explorer Configuration
+│   └── settings.json             # File nesting rules & cache exclusion
+├── 📄 main.py                    # FastAPI Web Application & API Route Definitions
+├── 📄 engine.py                  # Mathematical MCDA Engine (VPI, Knapsack, XAI)
+├── 📄 models.py                  # Relational Database Schema (SQLAlchemy Models)
+├── 📄 schemas.py                 # Data Validation & Serialization (Pydantic v2)
+├── 📄 database.py                # Database Engine & Connection Session
+├── 📄 auth.py                    # Security, Password Hashing & JWT Authentication
+├── 📄 seed.py                    # Master Database Seeder (20 Barangays & Demo Data)
+├── 📄 requirements.txt           # Python Project Dependencies
+├── 📄 README.md                  # Project Documentation
+└── 📄 .env.example               # Environment Variables Template
+```
+
+---
+
 ## Getting Started
 
 ### 1. Install Dependencies
