@@ -57,18 +57,45 @@ async function loadProgramData(programId) {
 
 function updateDashboardMetrics(program) {
     const stats = program.statistics || {};
-    document.getElementById('stat-total-households').textContent = stats.total_evaluated || 0;
-    document.getElementById('stat-approved').textContent = stats.approved_count || 0;
-    
     const quota = program.quota_limit || 10;
-    document.getElementById('stat-quota-util').textContent = `${Math.min(100, Math.round((stats.approved_count / quota) * 100))}% of ${quota} quota filled`;
+    const totalEval = stats.total_evaluated || 0;
+    const approvedCount = stats.approved_count || 0;
+    const disbursedCount = stats.disbursed_count || 0;
+    const totalBudget = stats.total_budget || 0;
+    const disbursedBudget = stats.disbursed_budget || 0;
+
+    const elQuota = document.getElementById('stat-quota');
+    if (elQuota) elQuota.textContent = quota;
+
+    const elApproved = document.getElementById('stat-approved');
+    if (elApproved) elApproved.textContent = approvedCount;
     
-    document.getElementById('stat-disbursed').textContent = stats.disbursed_count || 0;
-    const pctDisb = stats.approved_count > 0 ? Math.round((stats.disbursed_count / stats.approved_count) * 100) : 0;
-    document.getElementById('stat-disbursed-pct').textContent = `${pctDisb}% of approved disbursed`;
+    const quotaPct = Math.min(100, Math.round((approvedCount / quota) * 100));
+    const elQuotaUtil = document.getElementById('stat-quota-util');
+    if (elQuotaUtil) elQuotaUtil.textContent = `${quotaPct}% of ${quota} quota filled`;
     
-    document.getElementById('stat-budget').textContent = `₱${(stats.disbursed_budget || 0).toLocaleString()}`;
-    document.getElementById('stat-budget-total').textContent = `of ₱${(stats.total_budget || 0).toLocaleString()} total`;
+    const elDisbursed = document.getElementById('stat-disbursed');
+    if (elDisbursed) elDisbursed.textContent = disbursedCount;
+    
+    const pctDisb = approvedCount > 0 ? Math.round((disbursedCount / approvedCount) * 100) : 0;
+    const elDisbPct = document.getElementById('stat-disbursed-pct');
+    if (elDisbPct) elDisbPct.textContent = `${pctDisb}% of approved disbursed`;
+    
+    const elBudget = document.getElementById('stat-budget');
+    if (elBudget) elBudget.textContent = `₱${disbursedBudget.toLocaleString()}`;
+    const elBudgetTotal = document.getElementById('stat-budget-total');
+    if (elBudgetTotal) elBudgetTotal.textContent = `of ₱${totalBudget.toLocaleString()} total`;
+
+    // Progress bar animations
+    const pQuota = document.getElementById('stat-quota-progress');
+    if (pQuota) pQuota.style.width = '100%';
+    const pApproved = document.getElementById('stat-approved-progress');
+    if (pApproved) pApproved.style.width = `${quotaPct}%`;
+    const pDisb = document.getElementById('stat-disbursed-progress');
+    if (pDisb) pDisb.style.width = `${pctDisb}%`;
+    const pBudget = document.getElementById('stat-budget-progress');
+    const budgetPct = totalBudget > 0 ? Math.min(100, Math.round((disbursedBudget / totalBudget) * 100)) : 0;
+    if (pBudget) pBudget.style.width = `${budgetPct}%`;
 }
 
 function renderAllocationsTable(allocations) {
@@ -143,6 +170,7 @@ function renderAllocationsTable(allocations) {
                 </td>
             </tr>
         `;
+        renderAllocationsCards([]);
         lucide.createIcons();
         return;
     }
@@ -170,10 +198,19 @@ function renderAllocationsTable(allocations) {
             </span>`;
         }
 
-        // Rank pill
-        const rankDisplay = a.rank > 0 ? 
-            `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono font-bold ${a.status === 'Approved' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-200 text-slate-700'}">#${a.rank}</span>` :
-            `<span class="text-slate-300 text-sm font-bold pl-2.5">-</span>`;
+        // Rank pill with metallic medals for top 3
+        let rankDisplay = '';
+        if (a.rank === 1) {
+            rankDisplay = `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono font-black rank-medal-gold" title="Rank 1 - Highest Priority">🥇1</span>`;
+        } else if (a.rank === 2) {
+            rankDisplay = `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono font-black rank-medal-silver" title="Rank 2 - Silver Priority">🥈2</span>`;
+        } else if (a.rank === 3) {
+            rankDisplay = `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono font-black rank-medal-bronze" title="Rank 3 - Bronze Priority">🥉3</span>`;
+        } else if (a.rank > 0) {
+            rankDisplay = `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono font-bold ${a.status === 'Approved' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-200 text-slate-700'}">#${a.rank}</span>`;
+        } else {
+            rankDisplay = `<span class="text-slate-300 text-sm font-bold pl-2.5">-</span>`;
+        }
 
         // Flags
         const flags = [];
@@ -280,6 +317,181 @@ function renderAllocationsTable(allocations) {
         tbody.innerHTML = html;
     }
 
+    renderAllocationsCards(filtered);
+    lucide.createIcons();
+}
+
+let activeViewMode = 'table'; // 'table' | 'cards'
+
+function setViewMode(mode) {
+    activeViewMode = mode;
+    const tableWrapper = document.getElementById('allocations-table-wrapper');
+    const cardsWrapper = document.getElementById('allocations-cards-wrapper');
+    const btnTable = document.getElementById('view-mode-table');
+    const btnCards = document.getElementById('view-mode-cards');
+
+    if (mode === 'cards') {
+        if (tableWrapper) tableWrapper.classList.add('hidden');
+        if (cardsWrapper) cardsWrapper.classList.remove('hidden');
+        if (btnTable) {
+            btnTable.className = 'px-2.5 py-1 rounded-md hover:text-slate-900 flex items-center gap-1.5 transition-all text-slate-600 font-medium';
+        }
+        if (btnCards) {
+            btnCards.className = 'px-2.5 py-1 rounded-md bg-white font-bold text-indigo-700 shadow-xs flex items-center gap-1.5 transition-all';
+        }
+    } else {
+        if (tableWrapper) tableWrapper.classList.remove('hidden');
+        if (cardsWrapper) cardsWrapper.classList.add('hidden');
+        if (btnTable) {
+            btnTable.className = 'px-2.5 py-1 rounded-md bg-white font-bold text-indigo-700 shadow-xs flex items-center gap-1.5 transition-all';
+        }
+        if (btnCards) {
+            btnCards.className = 'px-2.5 py-1 rounded-md hover:text-slate-900 flex items-center gap-1.5 transition-all text-slate-600 font-medium';
+        }
+    }
+    lucide.createIcons();
+}
+
+function renderAllocationsCards(allocations) {
+    const container = document.getElementById('allocations-cards-container');
+    if (!container) return;
+
+    if (!allocations || allocations.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full py-12 text-center text-slate-400">
+                <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                    <i data-lucide="search-x" class="w-5 h-5"></i>
+                </div>
+                <p class="text-xs font-semibold text-slate-600">No applicant records found.</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Try selecting a different barangay, status, or search term.</p>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    container.innerHTML = allocations.map(a => {
+        const hh = a.household || {};
+        
+        // Status Badge
+        let statusBadge = '';
+        if (a.status === 'Approved') {
+            statusBadge = a.is_disbursed ? 
+                `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    <i data-lucide="check" class="w-3 h-3"></i> Disbursed
+                 </span>` :
+                `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <i data-lucide="check-circle" class="w-3 h-3"></i> Approved
+                 </span>`;
+        } else if (a.status === 'Waitlisted') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                <i data-lucide="clock" class="w-3 h-3"></i> Waitlisted
+            </span>`;
+        } else {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                <i data-lucide="x-circle" class="w-3 h-3"></i> Disqualified
+            </span>`;
+        }
+
+        // Rank Display with Metallic Badges for Top 3
+        let rankBadge = '';
+        if (a.rank === 1) {
+            rankBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-black rank-medal-gold shadow-sm">🥇 Rank #1</span>`;
+        } else if (a.rank === 2) {
+            rankBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-black rank-medal-silver shadow-sm">🥈 Rank #2</span>`;
+        } else if (a.rank === 3) {
+            rankBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-black rank-medal-bronze shadow-sm">🥉 Rank #3</span>`;
+        } else if (a.rank > 0) {
+            rankBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-bold ${a.status === 'Approved' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'}">Rank #${a.rank}</span>`;
+        } else {
+            rankBadge = `<span class="text-xs text-slate-400 font-medium">Unranked</span>`;
+        }
+
+        // Flags
+        const flags = [];
+        if (hh.is_informal_settler) flags.push(`<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10.5px] font-semibold border border-slate-200">Informal</span>`);
+        if (hh.has_calamity_damage) flags.push(`<span class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 text-[10.5px] font-semibold border border-amber-200">Calamity</span>`);
+        if (a.risk_analysis) {
+            const rLevel = a.risk_analysis.risk_level;
+            if (rLevel === 'HIGH') {
+                flags.push(`<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10.5px] font-bold border border-rose-300">⚠️ AI Risk</span>`);
+            } else if (rLevel === 'MEDIUM') {
+                flags.push(`<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10.5px] font-bold border border-amber-300">AI Med Risk</span>`);
+            }
+        }
+
+        const vpiScore = (a.vulnerability_score || 0).toFixed(4);
+        const scorePercent = Math.min(100, Math.round((a.vulnerability_score || 0) * 100));
+
+        return `
+            <div class="applicant-card bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col justify-between transition-all">
+                <div>
+                    <!-- Top Header: Rank & Status -->
+                    <div class="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        ${rankBadge}
+                        ${statusBadge}
+                    </div>
+
+                    <!-- Beneficiary Name & Reference -->
+                    <div class="mt-3">
+                        <h4 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5">
+                            <i data-lucide="user" class="w-4 h-4 text-indigo-500 flex-shrink-0"></i>
+                            <span class="truncate">${hh.head_name || 'N/A'}</span>
+                        </h4>
+                        <div class="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                            <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-medium text-slate-600">${hh.reference_number || 'NO-REF'}</span>
+                            <span>•</span>
+                            <span class="flex items-center gap-1 truncate"><i data-lucide="map-pin" class="w-3 h-3 text-slate-400"></i> Brgy. ${hh.barangay || 'Maramag'}</span>
+                        </div>
+                    </div>
+
+                    <!-- Socioeconomic Details Grid -->
+                    <div class="mt-3.5 grid grid-cols-2 gap-2 text-xs">
+                        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Monthly Income</span>
+                            <span class="font-mono font-bold text-slate-800 text-sm">₱${(hh.monthly_income || 0).toLocaleString()}</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Vulnerabilities</span>
+                            <div class="flex items-center gap-1 mt-0.5">
+                                ${hh.pwd_count > 0 ? `<span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold">${hh.pwd_count} PWD</span>` : ''}
+                                ${hh.elderly_count > 0 ? `<span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">${hh.elderly_count} Senior</span>` : ''}
+                                ${hh.pwd_count === 0 && hh.elderly_count === 0 ? `<span class="text-slate-500 text-[11px]">${hh.member_count || 1} members</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vulnerability Priority Score Meter -->
+                    <div class="mt-3 p-2.5 rounded-xl bg-indigo-50/50 border border-indigo-100">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-700">MCDA Priority Score</span>
+                            <span class="font-mono font-black text-indigo-700 text-xs">${vpiScore} (${scorePercent}%)</span>
+                        </div>
+                        <div class="w-full bg-indigo-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                            <div class="bg-indigo-600 h-1.5 rounded-full" style="width: ${scorePercent}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Flags -->
+                    ${flags.length > 0 ? `<div class="mt-2.5 flex flex-wrap gap-1.5">${flags.join('')}</div>` : ''}
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button onclick='openHouseholdModal("${hh.id}")'
+                        class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-2xs transition-all flex items-center gap-1">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5 text-slate-500"></i>
+                        <span>Edit Data</span>
+                    </button>
+                    <button onclick='openXaiDrawer(${JSON.stringify(a).replace(/'/g, "&#39;")})'
+                        class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 shadow-2xs transition-all flex items-center gap-1">
+                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                        <span>Audit XAI</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
     lucide.createIcons();
 }
 

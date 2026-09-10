@@ -4,12 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }} | SmartAid Maramag, Bukidnon</title>
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+                    },
                     colors: {
                         primary: {
                             50: '#eef2ff',
@@ -34,15 +42,15 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/style.css?v=2.1">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.2">
     <!-- PWA Web App Manifest -->
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#312e81">
+    <meta name="theme-color" content="#1e1b4b">
     <!-- Localization Engine -->
     <script src="/static/js/i18n.js"></script>
     {% block head %}{% endblock %}
 </head>
-<body class="min-h-full flex flex-col text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+<body class="min-h-full flex flex-col font-sans bg-slate-50 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
 
     <!-- Top Navigation Bar -->
     <header class="bg-slate-900/95 backdrop-blur-md text-white sticky top-0 z-40 shadow-md border-b border-slate-800 transition-all duration-200">

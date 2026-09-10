@@ -167,19 +167,26 @@
                     
                     <!-- Voucher Top Header -->
                     <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 flex items-center justify-between border-b border-indigo-500/30 relative z-10">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="px-2.5 py-0.5 rounded bg-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase tracking-wider border border-indigo-400/20">
-                                    Official Relief Voucher
-                                </span>
-                                ${claimStatus}
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-amber-400 flex items-center justify-center text-xl shadow-inner flex-shrink-0">
+                                🏛️
                             </div>
-                            <h3 class="text-xl sm:text-2xl font-black mt-1.5 tracking-tight text-white">${data.program_name || 'Emergency Relief Program'}</h3>
-                            <p class="text-xs text-indigo-200 font-medium">MSWDO • Municipality of Maramag, Province of Bukidnon</p>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-0.5 rounded bg-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase tracking-wider border border-indigo-400/20">
+                                        Official Relief Voucher
+                                    </span>
+                                    ${claimStatus}
+                                </div>
+                                <h3 class="text-xl sm:text-2xl font-black mt-1.5 tracking-tight text-white">${data.program_name || 'Emergency Relief Program'}</h3>
+                                <p class="text-xs text-indigo-200 font-medium">MSWDO • Municipality of Maramag, Province of Bukidnon</p>
+                            </div>
                         </div>
                         <div class="text-right hidden sm:block">
-                            <p class="text-[10px] text-indigo-300 font-mono">PRIORITY RANK</p>
-                            <p class="text-3xl font-black text-indigo-400">#${data.rank || '1'}</p>
+                            <p class="text-[10px] text-indigo-300 font-mono uppercase tracking-wider">PRIORITY RANK</p>
+                            <p class="text-3xl font-black ${data.rank === 1 ? 'text-amber-400' : data.rank === 2 ? 'text-slate-300' : data.rank === 3 ? 'text-amber-600' : 'text-indigo-400'} font-mono">
+                                ${data.rank === 1 ? '🥇 #1' : data.rank === 2 ? '🥈 #2' : data.rank === 3 ? '🥉 #3' : '#' + (data.rank || '1')}
+                            </p>
                         </div>
                     </div>
 

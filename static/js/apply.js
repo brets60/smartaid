@@ -5,6 +5,14 @@ let memberCount = 0;
 document.addEventListener('DOMContentLoaded', () => {
     // Add 1 default dependent row
     addMemberRow();
+
+    // Wire input listeners for real-time live estimator
+    const form = document.getElementById('apply-form');
+    if (form) {
+        form.addEventListener('input', updateEstimator);
+        form.addEventListener('change', updateEstimator);
+    }
+    updateEstimator();
 });
 
 function addMemberRow() {
@@ -49,11 +57,11 @@ function addMemberRow() {
 
         <div class="flex items-center gap-6 pt-1">
             <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
-                <input type="checkbox" class="member-pwd rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                <input type="checkbox" class="member-pwd rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" onchange="updateEstimator()">
                 <span>Person with Disability (PWD)</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
-                <input type="checkbox" class="member-senior rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                <input type="checkbox" class="member-senior rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" onchange="updateEstimator()">
                 <span>Senior Citizen (60+ yrs)</span>
             </label>
         </div>
@@ -61,6 +69,7 @@ function addMemberRow() {
 
     container.appendChild(div);
     lucide.createIcons();
+    updateEstimator();
 }
 
 function removeMemberRow(rowId) {
@@ -76,6 +85,7 @@ function removeMemberRow(rowId) {
                 const label = el.querySelector('span.text-xs.font-bold');
                 if (label) label.textContent = `Dependent Member #${idx + 1}`;
             });
+            updateEstimator();
         }, 200);
     }
 }
@@ -139,6 +149,7 @@ async function handleApplicationSubmit(e) {
 
         // Show confirmation view with animation
         document.getElementById('intake-form-container').classList.add('hidden');
+        document.getElementById('estimator-panel')?.classList.add('hidden');
         const confirmCard = document.getElementById('confirmation-card');
         confirmCard.classList.remove('hidden');
         confirmCard.classList.add('animate-scale-in');
@@ -188,8 +199,122 @@ function resetIntakeForm() {
     addMemberRow();
     document.getElementById('confirmation-card').classList.add('hidden');
     document.getElementById('intake-form-container').classList.remove('hidden');
+    document.getElementById('estimator-panel')?.classList.remove('hidden');
     const submitBtn = document.getElementById('submit-intake-btn');
     submitBtn.disabled = false;
     submitBtn.innerHTML = `<i data-lucide="send" class="w-4 h-4"></i><span>Submit Official Assistance Registration</span>`;
     lucide.createIcons();
+    updateEstimator();
+}
+
+function updateEstimator() {
+    const incomeInput = document.getElementById('monthly_income');
+    const income = incomeInput ? parseFloat(incomeInput.value) || 0 : 0;
+    const isInformal = document.getElementById('is_informal_settler')?.checked || false;
+    const hasCalamity = document.getElementById('has_calamity_damage')?.checked || false;
+
+    // Dependents counts
+    const memberElements = document.querySelectorAll('#members-container > div');
+    const memberCountTotal = 1 + memberElements.length; // Household head + dependents
+    let pwdCount = 0;
+    let seniorCount = 0;
+
+    memberElements.forEach(el => {
+        if (el.querySelector('.member-pwd')?.checked) pwdCount++;
+        if (el.querySelector('.member-senior')?.checked) seniorCount++;
+    });
+
+    const ceiling = 15000;
+    const isEligible = income <= ceiling;
+
+    const elBox = document.getElementById('est-eligibility-box');
+    const elBadge = document.getElementById('est-eligibility-badge');
+    const elDesc = document.getElementById('est-eligibility-desc');
+    const elScore = document.getElementById('est-vpi-score');
+    const elProgress = document.getElementById('est-vpi-progress');
+    const elTier = document.getElementById('est-tier-badge');
+    const elInc = document.getElementById('est-score-income');
+    const elDep = document.getElementById('est-score-dep');
+    const elHouse = document.getElementById('est-score-housing');
+    const elCalamity = document.getElementById('est-score-calamity');
+
+    if (!isEligible) {
+        if (elBox) {
+            elBox.className = 'mt-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-center transition-all';
+        }
+        if (elBadge) {
+            elBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span class="text-rose-700 font-bold">Exceeds ₱15,000 Ceiling</span>`;
+        }
+        if (elDesc) {
+            elDesc.className = 'text-[11px] text-rose-600/80 mt-1';
+            elDesc.textContent = `Reported ₱${income.toLocaleString()} exceeds statutory threshold.`;
+        }
+        if (elScore) elScore.textContent = '0.0000';
+        if (elProgress) {
+            elProgress.style.width = '0%';
+            elProgress.className = 'bg-rose-500 h-2.5 rounded-full transition-all duration-300';
+        }
+        if (elTier) {
+            elTier.className = 'font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[10px]';
+            elTier.textContent = 'Ineligible (Disqualified)';
+        }
+        if (elInc) elInc.textContent = '+0.000';
+        if (elDep) elDep.textContent = '+0.000';
+        if (elHouse) elHouse.textContent = '+0.000';
+        if (elCalamity) elCalamity.textContent = '+0.000';
+        return;
+    }
+
+    // MCDA Normalization formulas
+    const s_income = Math.max(0, Math.min(1.0, 1.0 - (income / ceiling)));
+    const effective_dependents = (pwdCount * 1.5) + (seniorCount * 1.0);
+    const s_dep = Math.max(0, Math.min(1.0, effective_dependents / Math.max(memberCountTotal, 1)));
+    const s_housing = isInformal ? 1.0 : 0.0;
+    const s_calamity = hasCalamity ? 1.0 : 0.0;
+
+    const w_income = 0.35;
+    const w_dep = 0.25;
+    const w_housing = 0.20;
+    const w_calamity = 0.20;
+
+    const c_income = s_income * w_income;
+    const c_dep = s_dep * w_dep;
+    const c_housing = s_housing * w_housing;
+    const c_calamity = s_calamity * w_calamity;
+
+    const vpi = c_income + c_dep + c_housing + c_calamity;
+    const vpiPercent = Math.min(100, Math.round(vpi * 100));
+
+    if (elBox) {
+        elBox.className = 'mt-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center transition-all';
+    }
+    if (elBadge) {
+        elBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-emerald-800 font-bold">Eligible (Meets Income Criteria)</span>`;
+    }
+    if (elDesc) {
+        elDesc.className = 'text-[11px] text-emerald-700/80 mt-1';
+        elDesc.textContent = `Monthly income of ₱${income.toLocaleString()} is within ₱15,000 threshold.`;
+    }
+    if (elScore) elScore.textContent = vpi.toFixed(4);
+    if (elProgress) {
+        elProgress.style.width = `${vpiPercent}%`;
+        elProgress.className = 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-500 h-2.5 rounded-full transition-all duration-300';
+    }
+    if (elTier) {
+        if (vpi >= 0.60) {
+            elTier.className = 'font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px]';
+            elTier.textContent = 'High Priority (Tier 1)';
+        } else if (vpi >= 0.35) {
+            elTier.className = 'font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px]';
+            elTier.textContent = 'Moderate Priority (Tier 2)';
+        } else {
+            elTier.className = 'font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px]';
+            elTier.textContent = 'Baseline Priority (Tier 3)';
+        }
+    }
+
+    if (elInc) elInc.textContent = `+${c_income.toFixed(3)}`;
+    if (elDep) elDep.textContent = `+${c_dep.toFixed(3)}`;
+    if (elHouse) elHouse.textContent = `+${c_housing.toFixed(3)}`;
+    if (elCalamity) elCalamity.textContent = `+${c_calamity.toFixed(3)}`;
 }
