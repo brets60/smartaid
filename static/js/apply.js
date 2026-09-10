@@ -34,12 +34,12 @@ function addMemberRow() {
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-                <label class="block text-[11px] font-semibold text-slate-600">First Name</label>
-                <input type="text" class="member-first-name mt-0.5 block w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all" required placeholder="First name">
+                <label class="block text-[11px] font-semibold text-slate-600">First Name <span class="text-slate-400 font-normal">(Optional)</span></label>
+                <input type="text" class="member-first-name mt-0.5 block w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all" placeholder="First name">
             </div>
             <div>
-                <label class="block text-[11px] font-semibold text-slate-600">Last Name</label>
-                <input type="text" class="member-last-name mt-0.5 block w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all" required placeholder="Last name">
+                <label class="block text-[11px] font-semibold text-slate-600">Last Name <span class="text-slate-400 font-normal">(Optional)</span></label>
+                <input type="text" class="member-last-name mt-0.5 block w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all" placeholder="Last name">
             </div>
             <div>
                 <label class="block text-[11px] font-semibold text-slate-600">Relationship to Head</label>
@@ -101,21 +101,21 @@ async function handleApplicationSubmit(e) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<span class="animate-spin mr-2">⏳</span> Registering in MCDA Engine...`;
 
-    // Extract members
+    // Extract members (gracefully ignore empty dependent rows)
     const memberElements = document.querySelectorAll('#members-container > div');
     const members = [];
 
     memberElements.forEach(el => {
-        const fn = el.querySelector('.member-first-name').value.trim();
-        const ln = el.querySelector('.member-last-name').value.trim();
-        const rel = el.querySelector('.member-rel').value;
-        const isPwd = el.querySelector('.member-pwd').checked;
-        const isSen = el.querySelector('.member-senior').checked;
+        const fn = (el.querySelector('.member-first-name')?.value || '').trim();
+        const ln = (el.querySelector('.member-last-name')?.value || '').trim();
+        const rel = el.querySelector('.member-rel')?.value || 'Relative';
+        const isPwd = el.querySelector('.member-pwd')?.checked || false;
+        const isSen = el.querySelector('.member-senior')?.checked || false;
 
-        if (fn && ln) {
+        if (fn || ln || isPwd || isSen) {
             members.push({
-                first_name: fn,
-                last_name: ln,
+                first_name: fn || 'Family',
+                last_name: ln || 'Dependent',
                 relationship_to_head: rel,
                 is_pwd: isPwd,
                 is_senior: isSen
@@ -146,6 +146,26 @@ async function handleApplicationSubmit(e) {
         if (!res.ok) {
             throw new Error(data.detail || 'Submission failed');
         }
+
+        // Broadcast to admin dashboard tabs
+        try {
+            const bc = new BroadcastChannel('smartaid_channel');
+            bc.postMessage({
+                type: 'NEW_APPLICATION',
+                reference_number: data.reference_number,
+                head_name: payload.head_name,
+                barangay: payload.barangay
+            });
+        } catch (bErr) {}
+
+        try {
+            localStorage.setItem('smartaid_last_application', JSON.stringify({
+                ref: data.reference_number,
+                name: payload.head_name,
+                barangay: payload.barangay,
+                timestamp: Date.now()
+            }));
+        } catch (lErr) {}
 
         // Show confirmation view with animation
         document.getElementById('intake-form-container').classList.add('hidden');

@@ -9,15 +9,25 @@ let isGroupedByBarangay = true;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check logged-in user context
-    if (window.CURRENT_USER && window.CURRENT_USER.assignedBarangay) {
-        activeBarangayFilter = window.CURRENT_USER.assignedBarangay;
-        const bSelect = document.getElementById('filter-barangay');
+    const cleanBrgy = (window.CURRENT_USER && window.CURRENT_USER.assignedBarangay)
+        ? window.CURRENT_USER.assignedBarangay.replace(/,\s*Maramag/i, '').trim()
+        : '';
+
+    const bSelect = document.getElementById('filter-barangay');
+
+    // Only lock filter if strictly barangay_staff
+    if (window.CURRENT_USER && window.CURRENT_USER.role === 'barangay_staff' && cleanBrgy) {
+        activeBarangayFilter = cleanBrgy;
         if (bSelect) {
-            bSelect.value = window.CURRENT_USER.assignedBarangay;
-            if (window.CURRENT_USER.role === 'barangay_staff') {
-                bSelect.disabled = true;
-                bSelect.title = `Locked to your assigned jurisdiction: Barangay ${window.CURRENT_USER.assignedBarangay}`;
-            }
+            bSelect.value = cleanBrgy;
+            bSelect.disabled = true;
+            bSelect.title = `Locked to your assigned jurisdiction: Barangay ${cleanBrgy}`;
+        }
+    } else {
+        // Admin, Social Worker, and Field Agent default to ALL so every household is visible
+        activeBarangayFilter = 'ALL';
+        if (bSelect) {
+            bSelect.value = 'ALL';
         }
     }
 
@@ -26,9 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
         currentProgramId = progSelect.value;
         loadProgramData(currentProgramId);
     }
+
+    // Initialize cross-tab live synchronization & background polling
+    setupLiveSync();
 });
 
-async function loadProgramData(programId) {
+async function loadProgramData(programId, silent = false) {
     if (!programId) return;
     currentProgramId = programId;
 
@@ -41,7 +54,8 @@ async function loadProgramData(programId) {
             updateDashboardMetrics(program);
             currentProgramRules = program.rules;
             populateWeightModalValues(program.rules);
-            document.getElementById('active-program-name-display').textContent = program.program_name;
+            const titleEl = document.getElementById('active-program-name-display');
+            if (titleEl) titleEl.textContent = program.program_name;
         }
 
         // Fetch allocations
@@ -53,6 +67,56 @@ async function loadProgramData(programId) {
     } catch (err) {
         console.error("Error loading program data:", err);
     }
+}
+
+async function refreshRosterData(silent = false) {
+    if (!currentProgramId) return;
+    const icon = document.getElementById('refresh-roster-icon');
+    if (!silent && icon) icon.classList.add('animate-spin');
+
+    try {
+        await loadProgramData(currentProgramId, silent);
+        if (!silent) {
+            showToast('Roster synchronized with database.');
+        }
+    } catch (err) {
+        console.error('Error refreshing roster:', err);
+    } finally {
+        if (!silent && icon) {
+            setTimeout(() => icon.classList.remove('animate-spin'), 600);
+        }
+    }
+}
+
+function setupLiveSync() {
+    // 1. BroadcastChannel listener (instant cross-tab synchronization)
+    try {
+        const bc = new BroadcastChannel('smartaid_channel');
+        bc.onmessage = (event) => {
+            if (event.data && event.data.type === 'NEW_APPLICATION') {
+                showToast(`🔔 New Applicant: ${event.data.head_name} registered in Brgy. ${event.data.barangay}!`);
+                refreshRosterData(true);
+            }
+        };
+    } catch (e) {}
+
+    // 2. Storage event listener fallback
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'smartaid_last_application') {
+            try {
+                const item = JSON.parse(e.newValue);
+                showToast(`🔔 New Applicant: ${item.name} registered in Brgy. ${item.barangay}!`);
+                refreshRosterData(true);
+            } catch (err) {}
+        }
+    });
+
+    // 3. Periodic sync every 25 seconds when tab is visible
+    setInterval(() => {
+        if (!document.hidden && currentProgramId) {
+            refreshRosterData(true);
+        }
+    }, 25000);
 }
 
 function updateDashboardMetrics(program) {
@@ -148,31 +212,49 @@ function renderAllocationsTable(allocations) {
         if (activeFilter !== 'ALL' && a.status !== activeFilter) {
             return false;
         }
-        // Barangay filter
+        // Barangay filter (case-insensitive & trimmed)
         const hh = a.household || {};
-        if (activeBarangayFilter !== 'ALL' && hh.barangay !== activeBarangayFilter) {
+        if (activeBarangayFilter !== 'ALL' && (hh.barangay || '').trim().toLowerCase() !== activeBarangayFilter.trim().toLowerCase()) {
             return false;
         }
-        // Search filter
+        // Search filter (Head Name, Reference Number, Barangay, Purok, Phone)
         if (searchVal) {
             const matchName = (hh.head_name || '').toLowerCase().includes(searchVal);
             const matchRef = (hh.reference_number || '').toLowerCase().includes(searchVal);
             const matchBrgy = (hh.barangay || '').toLowerCase().includes(searchVal);
             const matchPurok = (hh.purok_zone || '').toLowerCase().includes(searchVal);
-            return matchName || matchRef || matchBrgy || matchPurok;
+            const matchPhone = (hh.contact_number || '').includes(searchVal);
+            return matchName || matchRef || matchBrgy || matchPurok || matchPhone;
         }
         return true;
     });
 
+    // Update active filter notification banner
+    updateFilterStatusBanner(allocations.length, filtered.length, searchVal);
+
     if (filtered.length === 0) {
+        const hasFilters = (activeFilter !== 'ALL' || activeBarangayFilter !== 'ALL' || searchVal);
         tbody.innerHTML = `
             <tr>
                 <td colspan="9" class="py-12 text-center text-slate-400">
-                    <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
-                        <i data-lucide="search-x" class="w-5 h-5"></i>
+                    <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                        <i data-lucide="search-x" class="w-6 h-6"></i>
                     </div>
-                    <p class="text-xs font-semibold text-slate-600">No applicant records found.</p>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Try selecting a different barangay, status, or search term.</p>
+                    <p class="text-sm font-bold text-slate-700">No applicant records match current view.</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                        ${hasFilters 
+                            ? `Filters are currently active and hiding records. There are ${allocations.length} total applicant(s) in this program.` 
+                            : 'No applicants have been registered or evaluated into this program yet.'}
+                    </p>
+                    ${hasFilters ? `
+                        <div class="mt-4 flex justify-center gap-2">
+                            <button type="button" onclick="resetAllFilters()"
+                                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/20 transition-all">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                <span>Reset All Filters & View All 20 Barangays</span>
+                            </button>
+                        </div>
+                    ` : ''}
                 </td>
             </tr>
         `;
@@ -183,6 +265,10 @@ function renderAllocationsTable(allocations) {
 
     const renderRowHtml = (a) => {
         const hh = a.household || {};
+
+        // Is newly allocated within last 20 minutes?
+        const isRecent = a.allocated_at && (Date.now() - new Date(a.allocated_at).getTime() < 20 * 60 * 1000);
+        const newBadge = isRecent ? `<span class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse" title="Registered recently">NEW</span>` : '';
         
         // Status badge styling
         let statusBadge = '';
@@ -236,7 +322,7 @@ function renderAllocationsTable(allocations) {
             <tr class="hover:bg-slate-50/80 transition-colors">
                 <td class="py-3 pl-4 pr-3 sm:pl-6">${rankDisplay}</td>
                 <td class="px-3 py-3">
-                    <div class="font-bold text-slate-900">${hh.head_name || 'N/A'}</div>
+                    <div class="font-bold text-slate-900 flex items-center">${hh.head_name || 'N/A'}${newBadge}</div>
                     <div class="text-[11px] font-mono text-slate-400">${hh.reference_number || ''}</div>
                 </td>
                 <td class="px-3 py-3 text-slate-600">
@@ -363,13 +449,27 @@ function renderAllocationsCards(allocations) {
     if (!container) return;
 
     if (!allocations || allocations.length === 0) {
+        const hasFilters = (activeFilter !== 'ALL' || activeBarangayFilter !== 'ALL' || (document.getElementById('table-search')?.value || '').trim());
         container.innerHTML = `
             <div class="col-span-full py-12 text-center text-slate-400">
-                <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
-                    <i data-lucide="search-x" class="w-5 h-5"></i>
+                <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="search-x" class="w-6 h-6"></i>
                 </div>
-                <p class="text-xs font-semibold text-slate-600">No applicant records found.</p>
-                <p class="text-[11px] text-slate-400 mt-0.5">Try selecting a different barangay, status, or search term.</p>
+                <p class="text-sm font-bold text-slate-700">No applicant records match current view.</p>
+                <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                    ${hasFilters 
+                        ? `Filters are currently active and hiding records. There are ${allAllocations.length} total applicant(s) in this program.` 
+                        : 'No applicants have been registered or evaluated into this program yet.'}
+                </p>
+                ${hasFilters ? `
+                    <div class="mt-4 flex justify-center gap-2">
+                        <button type="button" onclick="resetAllFilters()"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/20 transition-all">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                            <span>Reset All Filters & View All 20 Barangays</span>
+                        </button>
+                    </div>
+                ` : ''}
             </div>
         `;
         lucide.createIcons();
@@ -378,6 +478,8 @@ function renderAllocationsCards(allocations) {
 
     container.innerHTML = allocations.map((a, idx) => {
         const hh = a.household || {};
+        const isRecent = a.allocated_at && (Date.now() - new Date(a.allocated_at).getTime() < 20 * 60 * 1000);
+        const newBadge = isRecent ? `<span class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">NEW</span>` : '';
         
         // Status Badge
         let statusBadge = '';
@@ -443,6 +545,7 @@ function renderAllocationsCards(allocations) {
                         <h4 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5">
                             <i data-lucide="user" class="w-4 h-4 text-indigo-500 flex-shrink-0"></i>
                             <span class="truncate">${hh.head_name || 'N/A'}</span>
+                            ${newBadge}
                         </h4>
                         <div class="flex items-center gap-2 mt-1 text-xs text-slate-500">
                             <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-medium text-slate-600">${hh.reference_number || 'NO-REF'}</span>
@@ -541,6 +644,53 @@ function setStatusFilter(filter) {
             }
         }
     });
+    renderAllocationsTable(allAllocations);
+}
+
+function updateFilterStatusBanner(totalCount, filteredCount, searchVal) {
+    const banner = document.getElementById('filter-status-banner');
+    const textEl = document.getElementById('filter-status-text');
+    if (!banner || !textEl) return;
+
+    const hasStatus = (activeFilter !== 'ALL');
+    const hasBrgy = (activeBarangayFilter !== 'ALL');
+    const hasSearch = Boolean(searchVal);
+
+    if (!hasStatus && !hasBrgy && !hasSearch) {
+        banner.classList.add('hidden');
+        return;
+    }
+
+    banner.classList.remove('hidden');
+    const chips = [];
+    if (hasBrgy) chips.push(`Barangay: <strong class="text-indigo-800">${activeBarangayFilter}</strong>`);
+    if (hasStatus) chips.push(`Status: <strong class="text-indigo-800">${activeFilter}</strong>`);
+    if (hasSearch) chips.push(`Search: <strong class="text-indigo-800">"${searchVal}"</strong>`);
+
+    textEl.innerHTML = `Showing <span class="font-bold text-slate-900">${filteredCount}</span> of <span class="font-bold text-slate-900">${totalCount}</span> applicants &bull; ${chips.join(' &bull; ')}`;
+    lucide.createIcons();
+}
+
+function resetAllFilters() {
+    activeFilter = 'ALL';
+    const isLockedStaff = (window.CURRENT_USER && window.CURRENT_USER.role === 'barangay_staff');
+    if (!isLockedStaff) {
+        activeBarangayFilter = 'ALL';
+        const bSelect = document.getElementById('filter-barangay');
+        if (bSelect) bSelect.value = 'ALL';
+    }
+    const searchInput = document.getElementById('table-search');
+    if (searchInput) searchInput.value = '';
+
+    ['ALL', 'Approved', 'Waitlisted', 'Disqualified'].forEach(f => {
+        const btn = document.getElementById(`filter-${f}`);
+        if (btn) {
+            btn.className = (f === 'ALL')
+                ? 'px-2.5 py-1 rounded-md bg-white font-semibold text-slate-900 shadow-sm'
+                : 'px-2.5 py-1 rounded-md hover:text-slate-900';
+        }
+    });
+
     renderAllocationsTable(allAllocations);
 }
 

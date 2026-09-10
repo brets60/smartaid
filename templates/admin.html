@@ -275,11 +275,18 @@
                     </select>
                 </div>
 
+                <!-- Refresh Roster Button -->
+                <button type="button" id="refresh-roster-btn" onclick="refreshRosterData()"
+                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 shadow-2xs transition-all" title="Synchronize latest applicant records">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-600" id="refresh-roster-icon"></i>
+                    <span id="refresh-roster-label">Refresh Roster</span>
+                </button>
+
                 <!-- Layout Toggle (Group by Barangay vs Flat List) -->
                 <button type="button" id="toggle-group-btn" onclick="toggleBarangayGrouping()"
                     class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5 shadow-2xs transition-all" title="Toggle grouping rows by barangay">
                     <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                    <span id="toggle-group-label">Grouped by Barangay: ON</span>
+                    <span id="toggle-group-label">Grouped: ON</span>
                 </button>
 
                 <!-- Status Filter Pills -->
@@ -302,6 +309,20 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- Active Filter Indicator Banner -->
+        <div id="filter-status-banner" class="hidden px-5 py-2.5 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between gap-3 text-xs text-indigo-900 animate-slide-down transition-all">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-600 text-white font-bold text-[11px]">
+                    <i data-lucide="filter" class="w-3 h-3"></i> Filter Active
+                </span>
+                <span id="filter-status-text" class="font-medium text-slate-700">Showing filtered applicant records</span>
+            </div>
+            <button type="button" onclick="resetAllFilters()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 shadow-2xs transition-all">
+                <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                <span>Reset All Filters</span>
+            </button>
         </div>
 
         <!-- Table View -->
