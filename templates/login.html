@@ -74,8 +74,13 @@
                                 <i data-lucide="key" class="w-4 h-4"></i>
                             </div>
                             <input type="password" id="password" required
-                                class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-xs sm:text-sm placeholder-slate-400 transition-all"
+                                class="block w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-xs sm:text-sm placeholder-slate-400 transition-all"
                                 placeholder="••••••••">
+                            <button type="button" id="toggle-password-btn" onclick="togglePasswordVisibility()" aria-label="Show password" title="Show password"
+                                class="btn-press absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none transition-colors cursor-pointer">
+                                <span id="password-eye-open" class="flex items-center"><i data-lucide="eye" class="w-4 h-4"></i></span>
+                                <span id="password-eye-closed" class="hidden items-center"><i data-lucide="eye-off" class="w-4 h-4 text-indigo-600"></i></span>
+                            </button>
                         </div>
                     </div>
 
@@ -208,6 +213,27 @@
     function fillLogin(user, pass) {
         document.getElementById('username').value = user;
         document.getElementById('password').value = pass;
+    }
+
+    function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('password');
+        const eyeOpen = document.getElementById('password-eye-open');
+        const eyeClosed = document.getElementById('password-eye-closed');
+        const toggleBtn = document.getElementById('toggle-password-btn');
+
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            eyeOpen.classList.add('hidden');
+            eyeClosed.classList.remove('hidden');
+            toggleBtn.setAttribute('title', 'Hide password');
+            toggleBtn.setAttribute('aria-label', 'Hide password');
+        } else {
+            passwordInput.type = 'password';
+            eyeClosed.classList.add('hidden');
+            eyeOpen.classList.remove('hidden');
+            toggleBtn.setAttribute('title', 'Show password');
+            toggleBtn.setAttribute('aria-label', 'Show password');
+        }
     }
 
     async function handleStaffLogin(e) {
