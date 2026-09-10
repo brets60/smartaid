@@ -65,6 +65,23 @@ def run_api_tests():
     allocs_res = client.get(f"/api/v1/programs/{program_id}/allocations", headers=headers)
     assert allocs_res.status_code == 200
     allocs = allocs_res.json()
+    if len(allocs) == 0:
+        # Submit test intake first if database has no allocations
+        pre_app = {
+            "head_name": "Initial Test Beneficiary",
+            "contact_number": "09171112233",
+            "barangay": "North Poblacion",
+            "purok_zone": "Purok 1",
+            "street_address": "Main Street",
+            "monthly_income": 4000.0,
+            "is_informal_settler": True,
+            "has_calamity_damage": False,
+            "members": []
+        }
+        client.post("/api/v1/apply", json=pre_app)
+        client.post(f"/api/v1/programs/{program_id}/evaluate", headers=headers)
+        allocs_res = client.get(f"/api/v1/programs/{program_id}/allocations", headers=headers)
+        allocs = allocs_res.json()
     assert len(allocs) > 0
     print(f"  ✓ GET /api/v1/programs/{program_id}/allocations -> 200 OK ({len(allocs)} allocations)")
 
@@ -128,7 +145,9 @@ def run_api_tests():
             json={"claim_qr_hash": undisbursed["claim_qr_hash"], "notes": "Automated integration scan test"},
             headers=headers
         )
-        assert scan1_res.status_code == 200
+        if scan1_res.status_code != 200:
+            print(f"  [DEBUG] scan1 failed with status {scan1_res.status_code}: {scan1_res.text}")
+        assert scan1_res.status_code == 200, f"Scan1 failed: {scan1_res.text}"
         scan1_data = scan1_res.json()
         assert scan1_data["status"] == "SUCCESS"
         assert scan1_data["valid"] is True

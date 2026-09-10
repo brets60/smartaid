@@ -14,35 +14,42 @@
 {% endblock %}
 
 {% block content %}
-<div class="min-h-[calc(100vh-12rem)] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="mx-auto w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
-            <i data-lucide="shield-check" class="w-7 h-7"></i>
+<div class="min-h-[calc(100vh-12rem)] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <!-- Ambient Glow -->
+    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-400/15 rounded-full blur-3xl pointer-events-none -z-10"></div>
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-md animate-slide-up text-center">
+        <div class="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 animate-float mb-3">
+            <i data-lucide="shield-check" class="w-8 h-8"></i>
         </div>
-        <h2 class="mt-4 text-center text-2xl font-extrabold text-slate-900 tracking-tight">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/5 border border-slate-900/10 text-slate-700 text-xs font-semibold backdrop-blur-sm mb-2">
+            <span class="beacon-dot"></span>
+            <span>Municipal Hall of Maramag, Bukidnon</span>
+        </div>
+        <h2 class="text-center text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             SmartAid Unified Portal
         </h2>
-        <p class="mt-1 text-center text-sm text-slate-500">
-            Staff access & public beneficiary tracking
+        <p class="mt-1 text-center text-xs sm:text-sm text-slate-500">
+            Municipality of Maramag Welfare Operations & Public Tracker
         </p>
     </div>
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-slate-200/80">
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md animate-slide-up delay-100">
+        <div class="glass-panel py-8 px-5 sm:px-10 shadow-2xl shadow-slate-200/60 sm:rounded-2xl border border-slate-200/90 relative">
             
             <!-- Tabs -->
             <div class="flex border-b border-slate-200 mb-6">
-                <button id="tab-btn-staff" onclick="switchTab('staff')" class="w-1/2 pb-3 font-semibold text-sm border-b-2 tab-active transition-all flex items-center justify-center gap-2">
+                <button id="tab-btn-staff" onclick="switchTab('staff')" class="w-1/2 pb-3 font-semibold text-xs sm:text-sm border-b-2 tab-active transition-all flex items-center justify-center gap-2">
                     <i data-lucide="lock" class="w-4 h-4"></i> Staff Portal
                 </button>
-                <button id="tab-btn-beneficiary" onclick="switchTab('beneficiary')" class="w-1/2 pb-3 font-semibold text-sm border-b-2 tab-inactive hover:text-slate-800 transition-all flex items-center justify-center gap-2">
+                <button id="tab-btn-beneficiary" onclick="switchTab('beneficiary')" class="w-1/2 pb-3 font-semibold text-xs sm:text-sm border-b-2 tab-inactive hover:text-slate-800 transition-all flex items-center justify-center gap-2">
                     <i data-lucide="search" class="w-4 h-4"></i> Beneficiary Status
                 </button>
             </div>
 
             <!-- TAB 1: STAFF PORTAL -->
-            <div id="tab-panel-staff" class="space-y-5">
-                <div id="staff-error" class="hidden p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+            <div id="tab-panel-staff" class="space-y-5 animate-fade-in">
+                <div id="staff-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2 animate-shake">
                     <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
                     <span id="staff-error-msg">Invalid credentials.</span>
                 </div>
@@ -50,30 +57,30 @@
                 <form id="staff-login-form" onsubmit="handleStaffLogin(event)" class="space-y-4">
                     <div>
                         <label for="username" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Username</label>
-                        <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="mt-1 relative rounded-lg shadow-2xs">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="user" class="w-4 h-4"></i>
                             </div>
                             <input type="text" id="username" required
-                                class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-slate-400"
+                                class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-xs sm:text-sm placeholder-slate-400 transition-all"
                                 placeholder="e.g. admin or agent1">
                         </div>
                     </div>
 
                     <div>
                         <label for="password" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</label>
-                        <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="mt-1 relative rounded-lg shadow-2xs">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="key" class="w-4 h-4"></i>
                             </div>
                             <input type="password" id="password" required
-                                class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-slate-400"
+                                class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-xs sm:text-sm placeholder-slate-400 transition-all"
                                 placeholder="••••••••">
                         </div>
                     </div>
 
                     <button type="submit" id="staff-submit-btn"
-                        class="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
+                        class="btn-press w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-md text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
                         <span>Sign In to Workstation</span>
                         <i data-lucide="arrow-right" class="w-4 h-4"></i>
                     </button>
@@ -81,82 +88,82 @@
 
                 <!-- Quick Seed Credentials Helper -->
                 <div class="pt-4 border-t border-slate-100">
-                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">Demo Quick-Fill Credentials</p>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">Demo Quick-Fill Credentials</p>
                     <div class="grid grid-cols-3 gap-2 text-xs">
-                        <button onclick="fillLogin('admin', 'admin123')" class="p-2 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 font-medium text-slate-700 transition-colors text-center border border-slate-200">
-                            <div class="font-bold">Admin</div>
+                        <button onclick="fillLogin('admin', 'admin123')" class="btn-press p-2 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 font-medium text-slate-700 transition-all text-center border border-slate-200/80 hover:border-indigo-200">
+                            <div class="font-bold text-xs">Admin</div>
                             <div class="text-[10px] text-slate-400">Maria Santos</div>
                         </button>
-                        <button onclick="fillLogin('worker1', 'worker123')" class="p-2 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 font-medium text-slate-700 transition-colors text-center border border-slate-200">
-                            <div class="font-bold">Social Worker</div>
+                        <button onclick="fillLogin('worker1', 'worker123')" class="btn-press p-2 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 font-medium text-slate-700 transition-all text-center border border-slate-200/80 hover:border-indigo-200">
+                            <div class="font-bold text-xs">Worker</div>
                             <div class="text-[10px] text-slate-400">Juan Dela Cruz</div>
                         </button>
-                        <button onclick="fillLogin('agent1', 'agent123')" class="p-2 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 font-medium text-slate-700 transition-colors text-center border border-slate-200">
-                            <div class="font-bold">Field Agent</div>
+                        <button onclick="fillLogin('agent1', 'agent123')" class="btn-press p-2 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 font-medium text-slate-700 transition-all text-center border border-slate-200/80 hover:border-indigo-200">
+                            <div class="font-bold text-xs">Field Agent</div>
                             <div class="text-[10px] text-slate-400">Ana Reyes</div>
                         </button>
                     </div>
 
                     <!-- 20 Maramag Barangay Accounts Selector -->
                     <div class="mt-3 pt-2.5 border-t border-slate-100">
-                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1 text-center">Or Sign In as Barangay Desk Officer</label>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 text-center">Or Sign In as Barangay Desk Officer</label>
                         <select onchange="if(this.value){ fillLogin(this.value, 'barangay123'); }"
-                            class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-700 font-medium focus:ring-indigo-500 focus:border-indigo-500 shadow-2xs">
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-2xs transition-all">
                             <option value="">-- Quick Select: 20 Maramag Barangays --</option>
-                            <option value="brgy_northpob">Barangay North Poblacion</option>
-                            <option value="brgy_southpob">Barangay South Poblacion</option>
-                            <option value="brgy_basecamp">Barangay Base Camp</option>
-                            <option value="brgy_dologon">Barangay Dologon</option>
-                            <option value="brgy_musuan">Barangay Musuan</option>
-                            <option value="brgy_camp1">Barangay Camp 1</option>
-                            <option value="brgy_panadtalan">Barangay Panadtalan</option>
-                            <option value="brgy_dagumbaan">Barangay Dagumbaan</option>
-                            <option value="brgy_kuya">Barangay Kuya</option>
-                            <option value="brgy_sanmiguel">Barangay San Miguel</option>
-                            <option value="brgy_sanroque">Barangay San Roque</option>
-                            <option value="brgy_colambugon">Barangay Colambugon</option>
-                            <option value="brgy_anahawon">Barangay Anahawon</option>
-                            <option value="brgy_bayabason">Barangay Bayabason</option>
-                            <option value="brgy_tubigon">Barangay Tubigon</option>
-                            <option value="brgy_laasuncion">Barangay La Asuncion</option>
-                            <option value="brgy_dibulang">Barangay Dibulang</option>
-                            <option value="brgy_kisanayan">Barangay Kisanayan</option>
-                            <option value="brgy_danggawan">Barangay Danggawan</option>
-                            <option value="brgy_panalsalan">Barangay Panalsalan</option>
+                            <option value="brgy_northpob">📍 Barangay North Poblacion</option>
+                            <option value="brgy_southpob">📍 Barangay South Poblacion</option>
+                            <option value="brgy_basecamp">📍 Barangay Base Camp</option>
+                            <option value="brgy_dologon">📍 Barangay Dologon</option>
+                            <option value="brgy_musuan">📍 Barangay Musuan</option>
+                            <option value="brgy_camp1">📍 Barangay Camp 1</option>
+                            <option value="brgy_panadtalan">📍 Barangay Panadtalan</option>
+                            <option value="brgy_dagumbaan">📍 Barangay Dagumbaan</option>
+                            <option value="brgy_kuya">📍 Barangay Kuya</option>
+                            <option value="brgy_sanmiguel">📍 Barangay San Miguel</option>
+                            <option value="brgy_sanroque">📍 Barangay San Roque</option>
+                            <option value="brgy_colambugon">📍 Barangay Colambugon</option>
+                            <option value="brgy_anahawon">📍 Barangay Anahawon</option>
+                            <option value="brgy_bayabason">📍 Barangay Bayabason</option>
+                            <option value="brgy_tubigon">📍 Barangay Tubigon</option>
+                            <option value="brgy_laasuncion">📍 Barangay La Asuncion</option>
+                            <option value="brgy_dibulang">📍 Barangay Dibulang</option>
+                            <option value="brgy_kisanayan">📍 Barangay Kisanayan</option>
+                            <option value="brgy_danggawan">📍 Barangay Danggawan</option>
+                            <option value="brgy_panalsalan">📍 Barangay Panalsalan</option>
                         </select>
                     </div>
                 </div>
             </div>
 
             <!-- TAB 2: BENEFICIARY QUICK TRACKER -->
-            <div id="tab-panel-beneficiary" class="hidden space-y-5">
+            <div id="tab-panel-beneficiary" class="hidden space-y-5 animate-fade-in">
                 <form id="track-form" onsubmit="handleBeneficiaryLookup(event)" class="space-y-4">
                     <div>
                         <label for="track-ref" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Application Reference Number</label>
-                        <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="mt-1 relative rounded-lg shadow-2xs">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="ticket" class="w-4 h-4"></i>
                             </div>
                             <input type="text" id="track-ref" required
-                                class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-slate-400 uppercase font-mono"
+                                class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-xs sm:text-sm placeholder-slate-400 uppercase font-mono transition-all"
                                 placeholder="e.g. APP-2026-00101">
                         </div>
                     </div>
 
                     <div>
                         <label for="track-phone" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Registered Contact Number (Optional)</label>
-                        <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="mt-1 relative rounded-lg shadow-2xs">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="phone" class="w-4 h-4"></i>
                             </div>
                             <input type="tel" id="track-phone"
-                                class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-slate-400"
+                                class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-xs sm:text-sm placeholder-slate-400 transition-all"
                                 placeholder="0917XXXXXXX">
                         </div>
                     </div>
 
                     <button type="submit"
-                        class="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-700 transition-all">
+                        class="btn-press w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-md text-xs sm:text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-700 transition-all">
                         <i data-lucide="search" class="w-4 h-4"></i>
                         <span>Check Status & Voucher</span>
                     </button>
@@ -166,7 +173,7 @@
                     <p class="text-xs text-slate-500">
                         Haven't registered your household yet?
                     </p>
-                    <a href="/apply" class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                    <a href="/apply" class="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
                         <span>Fill Out Public Intake Form</span>
                         <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
                     </a>

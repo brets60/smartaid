@@ -20,24 +20,29 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 relative overflow-hidden">
+    <!-- Ambient Glow -->
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
     <!-- Track Search Bar -->
-    <div id="track-search-section" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-md">
-        <h2 class="text-lg font-bold text-slate-900 mb-1">Beneficiary Application Tracker</h2>
-        <p class="text-xs text-slate-500 mb-4">Enter your application reference number to check evaluation status and access your digital claim voucher.</p>
+    <div id="track-search-section" class="glass-panel p-6 sm:p-7 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/90 animate-slide-up">
+        <div class="flex items-center gap-2 mb-1">
+            <span class="beacon-dot"></span>
+            <h2 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Beneficiary Application Tracker</h2>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">Enter your official application reference number to verify real-time MCDA priority scoring and access your cryptographic QR claim voucher.</p>
 
         <form id="track-search-form" onsubmit="lookupReference(event)" class="flex gap-2">
             <div class="relative flex-1">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <i data-lucide="ticket" class="w-4 h-4"></i>
                 </div>
                 <input type="text" id="track-input-ref" value="{{ initial_ref }}" required placeholder="e.g. APP-2026-00101"
-                    class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs font-mono uppercase focus:ring-indigo-500 focus:border-indigo-500">
+                    class="block w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold uppercase focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all">
             </div>
             <button type="submit" id="track-search-btn"
-                class="px-5 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm transition-all">
-                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                class="btn-press px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all">
+                <i data-lucide="search" class="w-4 h-4"></i>
                 <span>Search</span>
             </button>
         </form>
@@ -126,39 +131,49 @@
 
             mainContent = `
                 <!-- OFFICIAL DIGITAL CLAIM VOUCHER / PASS -->
-                <div id="voucher-card" class="bg-white rounded-2xl border-2 border-indigo-600 shadow-2xl overflow-hidden">
+                <div id="voucher-card" class="voucher-border rounded-2xl shadow-2xl overflow-hidden animate-scale-in relative">
+                    <!-- Top Security Stripe -->
+                    <div class="voucher-security-stripe"></div>
+
+                    <!-- Watermark -->
+                    <div class="voucher-watermark">OFFICIAL MSWDO VOUCHER</div>
                     
                     <!-- Voucher Top Header -->
-                    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 flex items-center justify-between border-b border-indigo-500/30">
+                    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 flex items-center justify-between border-b border-indigo-500/30 relative z-10">
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase tracking-wider">
+                                <span class="px-2.5 py-0.5 rounded bg-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase tracking-wider border border-indigo-400/20">
                                     Official Relief Voucher
                                 </span>
                                 ${claimStatus}
                             </div>
-                            <h3 class="text-xl font-black mt-1.5 tracking-tight">${data.program_name || 'Emergency Relief Program'}</h3>
+                            <h3 class="text-xl sm:text-2xl font-black mt-1.5 tracking-tight text-white">${data.program_name || 'Emergency Relief Program'}</h3>
                             <p class="text-xs text-indigo-200 font-medium">MSWDO • Municipality of Maramag, Province of Bukidnon</p>
                         </div>
                         <div class="text-right hidden sm:block">
-                            <p class="text-[10px] text-slate-400 font-mono">PRIORITY RANK</p>
-                            <p class="text-2xl font-black text-indigo-400">#${data.rank || '1'}</p>
+                            <p class="text-[10px] text-indigo-300 font-mono">PRIORITY RANK</p>
+                            <p class="text-3xl font-black text-indigo-400">#${data.rank || '1'}</p>
                         </div>
                     </div>
 
                     <!-- Voucher Body -->
-                    <div class="p-6 sm:p-8 space-y-6">
+                    <div class="p-6 sm:p-8 space-y-6 relative z-10 bg-white/95">
                         
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 items-center">
-                            <!-- QR Code Stub -->
+                            <!-- QR Code Stub with Reticle Corners -->
                             <div class="text-center sm:border-r border-slate-200 sm:pr-6">
-                                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm inline-block">
+                                <div class="relative p-3.5 bg-white rounded-2xl border border-slate-200 shadow-sm inline-block group">
+                                    <div class="scanner-reticle-corner scanner-corner-tl"></div>
+                                    <div class="scanner-reticle-corner scanner-corner-tr"></div>
+                                    <div class="scanner-reticle-corner scanner-corner-bl"></div>
+                                    <div class="scanner-reticle-corner scanner-corner-br"></div>
                                     <img src="${data.qr_image_url}" alt="Cryptographic QR Claim Stub" class="w-40 h-40 mx-auto rounded-lg">
                                 </div>
                                 <p class="text-[10px] font-mono text-slate-400 mt-2 break-all">
                                     ${data.claim_qr_hash ? data.claim_qr_hash.substring(0, 16) + '...' : ''}
                                 </p>
-                                <span class="inline-block mt-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                <span class="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                                    <span class="beacon-dot"></span>
                                     SHA-256 Verified
                                 </span>
                             </div>
@@ -167,23 +182,23 @@
                             <div class="sm:col-span-2 space-y-3">
                                 <div>
                                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Beneficiary Head</p>
-                                    <h4 class="text-lg font-bold text-slate-900">${data.head_name}</h4>
+                                    <h4 class="text-xl font-extrabold text-slate-900 tracking-tight">${data.head_name}</h4>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-3 text-xs">
-                                    <div>
+                                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase">Reference Number</p>
                                         <p class="font-mono font-bold text-indigo-600">${data.reference_number}</p>
                                     </div>
-                                    <div>
+                                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase">Registered Contact</p>
                                         <p class="font-semibold text-slate-700">${data.contact_number}</p>
                                     </div>
-                                    <div>
+                                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase">Barangay & Zone</p>
                                         <p class="font-semibold text-slate-700">${data.barangay}, ${data.purok_zone}</p>
                                     </div>
-                                    <div>
+                                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase">Assigned Benefit</p>
                                         <p class="font-bold text-slate-900">₱${data.budget_per_slot ? data.budget_per_slot.toLocaleString() : '5,000'} / Food Pack</p>
                                     </div>
@@ -203,13 +218,13 @@
                         </div>
 
                         <!-- Claiming Instructions -->
-                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-                            <p class="font-bold text-slate-900 flex items-center gap-1.5">
+                        <div class="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 text-xs text-slate-600 space-y-1.5">
+                            <p class="font-bold text-indigo-950 flex items-center gap-1.5">
                                 <i data-lucide="info" class="w-4 h-4 text-indigo-600"></i>
-                                Claiming Guidelines at Distribution Post:
+                                Official Claiming Guidelines at Distribution Post:
                             </p>
-                            <ul class="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
-                                <li>Present this digital voucher on your smartphone or bring a printed copy.</li>
+                            <ul class="list-disc list-inside space-y-0.5 text-slate-600 pl-1 text-[11.5px]">
+                                <li>Present this digital voucher on your smartphone or bring a clear printed copy.</li>
                                 <li>Present any valid government ID or Barangay Certificate of Residency.</li>
                                 <li>The field worker will scan this QR code to verify and release your aid package.</li>
                             </ul>
@@ -218,10 +233,10 @@
                     </div>
 
                     <!-- Print Action Bar -->
-                    <div id="print-action-bar" class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 no-print">
-                        <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-all">
+                    <div id="print-action-bar" class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 no-print relative z-10">
+                        <button onclick="window.print()" class="btn-press inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-md transition-all">
                             <i data-lucide="printer" class="w-4 h-4"></i>
-                            <span>Print Voucher / Claim Stub</span>
+                            <span>Print Official Voucher Pass</span>
                         </button>
                     </div>
 

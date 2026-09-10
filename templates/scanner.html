@@ -17,46 +17,66 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 relative overflow-hidden">
+    <!-- Ambient Glow -->
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
     <!-- Header -->
-    <div class="text-center">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold mb-2">
-            <i data-lucide="scan" class="w-3.5 h-3.5"></i>
-            Field Agent Station
+    <div class="glass-panel text-center p-6 sm:p-7 rounded-2xl shadow-xl border border-white/80 animate-slide-up">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold mb-2 shadow-xs">
+            <span class="beacon-dot"></span>
+            <span>Field Agent Station • Maramag MSWDO</span>
         </div>
-        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Cryptographic QR Disbursement Scanner</h1>
-        <p class="text-xs text-slate-500 mt-1">
-            Scan beneficiary voucher tokens or enter claim hashes to verify eligibility and prevent double disbursements.
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Cryptographic QR Disbursement Scanner</h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-lg mx-auto">
+            Scan beneficiary voucher tokens or enter claim hashes to verify eligibility in real-time and prevent double disbursements.
         </p>
     </div>
 
     <!-- SCANNER CONTAINER -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden p-6 space-y-5">
+    <div class="glass-panel rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden p-6 sm:p-7 space-y-5 border border-slate-200/90 animate-slide-up delay-75">
         
         <!-- Live Camera Viewfinder Box -->
-        <div class="relative bg-slate-950 rounded-2xl overflow-hidden min-h-[260px] flex flex-col items-center justify-center p-2 text-white">
-            <div id="reader" class="w-full"></div>
+        <div class="relative bg-slate-950 rounded-2xl overflow-hidden min-h-[280px] flex flex-col items-center justify-center p-2 text-white border border-slate-800 shadow-inner group">
+            <!-- HUD Reticle Corners -->
+            <div class="scanner-reticle-corner scanner-corner-tl"></div>
+            <div class="scanner-reticle-corner scanner-corner-tr"></div>
+            <div class="scanner-reticle-corner scanner-corner-bl"></div>
+            <div class="scanner-reticle-corner scanner-corner-br"></div>
+
+            <!-- Sweeping Animated Laser Beam -->
+            <div id="scanner-laser" class="scanner-laser-line hidden"></div>
+
+            <!-- HTML5 QR Video Element Target -->
+            <div id="reader" class="w-full relative z-10"></div>
             
-            <div id="camera-idle-placeholder" class="py-12 text-center space-y-3">
-                <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-indigo-400">
+            <div id="camera-idle-placeholder" class="py-12 text-center space-y-3 z-10">
+                <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-indigo-400 shadow-md">
                     <i data-lucide="camera" class="w-8 h-8"></i>
                 </div>
                 <div>
-                    <p class="text-sm font-semibold text-slate-200">Camera Viewfinder Idle</p>
-                    <p class="text-xs text-slate-400">Click below to start live video barcode scanning</p>
+                    <p class="text-sm font-bold text-slate-200">Camera Viewfinder Idle</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Click below to activate optical barcode and QR scanning</p>
                 </div>
+            </div>
+
+            <!-- HUD Overlay Status Pill -->
+            <div class="absolute bottom-3 left-3 z-30">
+                <span id="hud-status-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900/80 text-slate-300 border border-slate-700/80 flex items-center gap-1.5 backdrop-blur-xs">
+                    <span id="hud-status-dot" class="beacon-dot-amber"></span>
+                    <span id="hud-status-text">STANDBY</span>
+                </span>
             </div>
         </div>
 
         <!-- Scanner Camera Controls -->
         <div class="flex items-center justify-center gap-3">
             <button type="button" id="start-scan-btn" onclick="startScanner()"
-                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all">
+                class="btn-press inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-xs sm:text-sm bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 transition-all">
                 <i data-lucide="video" class="w-4 h-4"></i>
                 <span>Start Camera Scanner</span>
             </button>
-            <button type="button" id="stop-scan-btn" onclick="stopScanner()" class="hidden inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-white shadow-md transition-all">
+            <button type="button" id="stop-scan-btn" onclick="stopScanner()" class="hidden btn-press inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-white shadow-md transition-all">
                 <i data-lucide="video-off" class="w-4 h-4"></i>
                 <span>Stop Camera</span>
             </button>
@@ -64,13 +84,13 @@
 
         <!-- Manual Token / Ref Hash Input Fallback -->
         <div class="pt-4 border-t border-slate-100">
-            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">Manual Voucher Verification Fallback</p>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">Manual Voucher Verification Fallback</p>
             <form onsubmit="handleManualVerify(event)" class="flex gap-2">
                 <input type="text" id="manual-token-input" placeholder="Enter Reference (e.g. APP-2026-00101) or SHA-256 Hash"
-                    class="flex-1 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-indigo-500 focus:border-indigo-500">
+                    class="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all">
                 <button type="submit"
-                    class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-1.5 shadow-sm">
-                    <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                    class="btn-press px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="check" class="w-4 h-4"></i>
                     <span>Verify</span>
                 </button>
             </form>
