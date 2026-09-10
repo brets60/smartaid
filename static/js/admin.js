@@ -64,25 +64,31 @@ function updateDashboardMetrics(program) {
     const totalBudget = stats.total_budget || 0;
     const disbursedBudget = stats.disbursed_budget || 0;
 
-    const elQuota = document.getElementById('stat-quota');
-    if (elQuota) elQuota.textContent = quota;
+    // Rolling number animations
+    if (typeof animateCounter === 'function') {
+        animateCounter('stat-quota', quota, 700);
+        animateCounter('stat-approved', approvedCount, 750);
+        animateCounter('stat-disbursed', disbursedCount, 750);
+        animateCounter('stat-budget', disbursedBudget, 850, '₱', '', true);
+    } else {
+        const elQuota = document.getElementById('stat-quota');
+        if (elQuota) elQuota.textContent = quota;
+        const elApproved = document.getElementById('stat-approved');
+        if (elApproved) elApproved.textContent = approvedCount;
+        const elDisbursed = document.getElementById('stat-disbursed');
+        if (elDisbursed) elDisbursed.textContent = disbursedCount;
+        const elBudget = document.getElementById('stat-budget');
+        if (elBudget) elBudget.textContent = `₱${disbursedBudget.toLocaleString()}`;
+    }
 
-    const elApproved = document.getElementById('stat-approved');
-    if (elApproved) elApproved.textContent = approvedCount;
-    
     const quotaPct = Math.min(100, Math.round((approvedCount / quota) * 100));
     const elQuotaUtil = document.getElementById('stat-quota-util');
     if (elQuotaUtil) elQuotaUtil.textContent = `${quotaPct}% of ${quota} quota filled`;
-    
-    const elDisbursed = document.getElementById('stat-disbursed');
-    if (elDisbursed) elDisbursed.textContent = disbursedCount;
     
     const pctDisb = approvedCount > 0 ? Math.round((disbursedCount / approvedCount) * 100) : 0;
     const elDisbPct = document.getElementById('stat-disbursed-pct');
     if (elDisbPct) elDisbPct.textContent = `${pctDisb}% of approved disbursed`;
     
-    const elBudget = document.getElementById('stat-budget');
-    if (elBudget) elBudget.textContent = `₱${disbursedBudget.toLocaleString()}`;
     const elBudgetTotal = document.getElementById('stat-budget-total');
     if (elBudgetTotal) elBudgetTotal.textContent = `of ₱${totalBudget.toLocaleString()} total`;
 
@@ -370,7 +376,7 @@ function renderAllocationsCards(allocations) {
         return;
     }
 
-    container.innerHTML = allocations.map(a => {
+    container.innerHTML = allocations.map((a, idx) => {
         const hh = a.household || {};
         
         // Status Badge
@@ -424,7 +430,7 @@ function renderAllocationsCards(allocations) {
         const scorePercent = Math.min(100, Math.round((a.vulnerability_score || 0) * 100));
 
         return `
-            <div class="applicant-card bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col justify-between transition-all">
+            <div class="applicant-card card-stagger bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col justify-between transition-all" style="--i: ${Math.min(idx, 15)}">
                 <div>
                     <!-- Top Header: Rank & Status -->
                     <div class="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">

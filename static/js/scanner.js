@@ -400,6 +400,9 @@ function renderVerificationResponse(data, httpStatus) {
 
             </div>
         `;
+        if (typeof fireConfetti === 'function') {
+            fireConfetti({ colors: ['#10b981', '#059669', '#34d399', '#fbbf24', '#6366f1'], count: 90 });
+        }
     } else if (data.status === "ALREADY_CLAIMED") {
         // RED CARD: DOUBLE-CLAIM PREVENTION TRIGGERED
         container.innerHTML = `

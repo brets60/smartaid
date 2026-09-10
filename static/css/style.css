@@ -431,3 +431,97 @@ html {
 .estimator-glow {
     box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15), 0 8px 24px -4px rgba(99, 102, 241, 0.12);
 }
+
+/* =========================================================================
+   ADVANCED CIVIC ANIMATION UTILITIES
+   ========================================================================= */
+
+/* Holographic sweep shimmer on vouchers and security badges */
+@keyframes holographicSweep {
+    0% {
+        transform: translateX(-100%) rotate(25deg);
+    }
+    40%, 100% {
+        transform: translateX(250%) rotate(25deg);
+    }
+}
+
+.holographic-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+
+.holographic-shimmer::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        60deg,
+        transparent 35%,
+        rgba(255, 255, 255, 0.22) 50%,
+        transparent 65%
+    );
+    transform: translateX(-100%) rotate(25deg);
+    animation: holographicSweep 6s infinite ease-in-out;
+    pointer-events: none;
+}
+
+/* Cascading staggered card entrance */
+@keyframes cardCascade {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 16px, 0) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+.card-stagger {
+    animation: cardCascade 0.38s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* High-tech QR HUD Scanner Laser */
+@keyframes scannerSweep {
+    0%, 100% {
+        top: 8%;
+        opacity: 0.65;
+    }
+    50% {
+        top: 92%;
+        opacity: 1;
+    }
+}
+
+.scanner-laser {
+    position: absolute;
+    left: 4%;
+    right: 4%;
+    height: 3px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent);
+    box-shadow: 0 0 12px 2px rgba(16, 185, 129, 0.8), 0 0 4px rgba(52, 211, 153, 0.9);
+    animation: scannerSweep 2.2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* Button micro-interaction ripple feedback */
+.btn-press:active {
+    transform: scale(0.97);
+}
+
+/* Accessibility: respect user operating system motion preference */
+@media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

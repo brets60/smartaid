@@ -156,6 +156,11 @@ async function handleApplicationSubmit(e) {
         document.getElementById('confirmed-ref-number').textContent = data.reference_number;
         document.getElementById('track-confirmed-btn').href = `/track?ref=${encodeURIComponent(data.reference_number)}`;
 
+        // Trigger celebratory confetti burst
+        if (typeof fireConfetti === 'function') {
+            fireConfetti({ count: 120 });
+        }
+
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -295,7 +300,13 @@ function updateEstimator() {
         elDesc.className = 'text-[11px] text-emerald-700/80 mt-1';
         elDesc.textContent = `Monthly income of ₱${income.toLocaleString()} is within ₱15,000 threshold.`;
     }
-    if (elScore) elScore.textContent = vpi.toFixed(4);
+    if (elScore) {
+        if (typeof animateCounter === 'function') {
+            animateCounter('est-vpi-score', vpi, 350);
+        } else {
+            elScore.textContent = vpi.toFixed(4);
+        }
+    }
     if (elProgress) {
         elProgress.style.width = `${vpiPercent}%`;
         elProgress.className = 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-500 h-2.5 rounded-full transition-all duration-300';
