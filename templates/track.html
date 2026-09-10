@@ -118,6 +118,31 @@
         let statusBadge = '';
         let mainContent = '';
 
+        let activeNarratives = data.ai_narrative || null;
+
+        function buildXAINarrativeBox(narratives) {
+            if (!narratives) return '';
+            const initialLang = (localStorage.getItem('smartaid_lang') === 'ceb') ? 'ceb' : 'en';
+            const initialText = (initialLang === 'ceb' && narratives.ceb) ? narratives.ceb : (narratives.en || '');
+            return `
+                <div class="p-4 rounded-xl bg-gradient-to-br from-indigo-50/80 via-purple-50/30 to-slate-50 border border-indigo-100 shadow-2xs space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5 text-xs font-bold text-indigo-900">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+                            <span>Explainable AI (XAI) Decision Justification</span>
+                        </div>
+                        <div class="inline-flex rounded-lg p-0.5 bg-slate-200/80 text-[10.5px] font-bold">
+                            <button type="button" onclick="switchTrackNarrative('en')" id="track-btn-en" class="px-2 py-0.5 rounded-md ${initialLang === 'en' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">EN</button>
+                            <button type="button" onclick="switchTrackNarrative('ceb')" id="track-btn-ceb" class="px-2 py-0.5 rounded-md ${initialLang === 'ceb' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">CEB</button>
+                        </div>
+                    </div>
+                    <p id="track-xai-narrative-text" class="text-xs text-slate-700 leading-relaxed italic bg-white/80 p-3 rounded-lg border border-indigo-100/60">
+                        "${initialText}"
+                    </p>
+                </div>
+            `;
+        }
+
         if (data.status === 'Approved') {
             statusBadge = `
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
@@ -128,6 +153,8 @@
             const claimStatus = data.is_disbursed ? 
                 `<span class="px-2.5 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-200">CLAIMED on ${new Date(data.disbursed_at).toLocaleDateString()}</span>` :
                 `<span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-600 text-white animate-pulse">READY TO CLAIM</span>`;
+
+            const xaiHtml = buildXAINarrativeBox(data.ai_narrative);
 
             mainContent = `
                 <!-- OFFICIAL DIGITAL CLAIM VOUCHER / PASS -->
@@ -159,63 +186,43 @@
                     <!-- Voucher Body -->
                     <div class="p-6 sm:p-8 space-y-6 relative z-10 bg-white/95">
                         
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 items-center">
-                            <!-- QR Code Stub with Reticle Corners -->
-                            <div class="text-center sm:border-r border-slate-200 sm:pr-6">
-                                <div class="relative p-3.5 bg-white rounded-2xl border border-slate-200 shadow-sm inline-block group">
-                                    <div class="scanner-reticle-corner scanner-corner-tl"></div>
-                                    <div class="scanner-reticle-corner scanner-corner-tr"></div>
-                                    <div class="scanner-reticle-corner scanner-corner-bl"></div>
-                                    <div class="scanner-reticle-corner scanner-corner-br"></div>
-                                    <img src="${data.qr_image_url}" alt="Cryptographic QR Claim Stub" class="w-40 h-40 mx-auto rounded-lg">
-                                </div>
-                                <p class="text-[10px] font-mono text-slate-400 mt-2 break-all">
-                                    ${data.claim_qr_hash ? data.claim_qr_hash.substring(0, 16) + '...' : ''}
-                                </p>
-                                <span class="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                                    <span class="beacon-dot"></span>
-                                    SHA-256 Verified
-                                </span>
+                        <div class="flex flex-col sm:flex-row gap-6 items-center sm:items-start justify-between">
+                            <!-- Left: QR Code Card -->
+                            <div class="flex flex-col items-center p-4 rounded-2xl bg-white border-2 border-slate-900/10 shadow-lg text-center flex-shrink-0 w-48">
+                                ${data.qr_image_url ? `
+                                    <img src="${data.qr_image_url}" alt="Claim QR Code" class="w-36 h-36 rounded-lg mb-2 border border-slate-100 p-1">
+                                ` : `
+                                    <div class="w-36 h-36 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 mb-2">
+                                        <i data-lucide="qr-code" class="w-12 h-12"></i>
+                                    </div>
+                                `}
+                                <span class="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider">SECURE QR TOKEN</span>
+                                <span class="text-[9.5px] font-mono text-indigo-600 truncate max-w-[150px] font-semibold">${data.claim_qr_hash ? data.claim_qr_hash.substring(0, 16) + '...' : 'SECURE-TOKEN'}</span>
                             </div>
 
-                            <!-- Beneficiary Details -->
-                            <div class="sm:col-span-2 space-y-3">
+                            <!-- Right: Household Data & Breakdown -->
+                            <div class="flex-1 space-y-4 w-full">
                                 <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Beneficiary Head</p>
-                                    <h4 class="text-xl font-extrabold text-slate-900 tracking-tight">${data.head_name}</h4>
+                                    <span class="text-[10.5px] font-mono text-indigo-600 font-bold uppercase tracking-wider">BENEFICIARY HEAD</span>
+                                    <h4 class="text-lg sm:text-xl font-black text-slate-900">${data.head_name}</h4>
+                                    <p class="text-xs text-slate-500 font-medium">${data.street_address || ''}, ${data.purok_zone}, Brgy. ${data.barangay}</p>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-3 text-xs">
                                     <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
-                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Reference Number</p>
-                                        <p class="font-mono font-bold text-indigo-600">${data.reference_number}</p>
-                                    </div>
-                                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
-                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Registered Contact</p>
-                                        <p class="font-semibold text-slate-700">${data.contact_number}</p>
-                                    </div>
-                                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
-                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Barangay & Zone</p>
-                                        <p class="font-semibold text-slate-700">${data.barangay}, ${data.purok_zone}</p>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase">Reference Code</p>
+                                        <p class="font-mono font-bold text-slate-900">${data.reference_number}</p>
                                     </div>
                                     <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase">Assigned Benefit</p>
                                         <p class="font-bold text-slate-900">₱${data.budget_per_slot ? data.budget_per_slot.toLocaleString() : '5,000'} / Food Pack</p>
                                     </div>
                                 </div>
-
-                                <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                                    <div>
-                                        <span class="text-slate-400">Vulnerability Index (VPI):</span>
-                                        <span class="font-mono font-bold text-indigo-600 ml-1">${data.vulnerability_score ? data.vulnerability_score.toFixed(4) : 'N/A'}</span>
-                                    </div>
-                                    <div>
-                                        <span class="text-slate-400">Quota Placement:</span>
-                                        <span class="font-semibold text-slate-700 ml-1">#${data.rank} of ${data.total_quota} slots</span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
+
+                        <!-- Generative XAI Decision Justification -->
+                        ${xaiHtml}
 
                         <!-- Claiming Instructions -->
                         <div class="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 text-xs text-slate-600 space-y-1.5">
@@ -267,6 +274,8 @@
                         Your household meets all baseline eligibility criteria with a Vulnerability Priority Index (VPI) of <strong>${data.vulnerability_score ? data.vulnerability_score.toFixed(4) : 'N/A'}</strong>. 
                         However, the program quota of <strong>${data.total_quota} slots</strong> was filled by higher-priority applicants. You have been placed on the priority waitlist and will be automatically promoted if additional relief allocations become available.
                     </p>
+
+                    ${buildXAINarrativeBox(data.ai_narrative)}
                 </div>
             `;
         } else {
@@ -294,12 +303,16 @@
                         <p class="mt-1">${reason}</p>
                     </div>
 
+                    ${buildXAINarrativeBox(data.ai_narrative)}
+
                     <p class="text-xs text-slate-500">
                         If you believe this determination was made in error or if your socioeconomic circumstances have recently changed, please visit your local Barangay hall or City Social Welfare and Development Office for manual appeal.
                     </p>
                 </div>
             `;
         }
+
+        window.__CURRENT_ACTIVE_NARRATIVES__ = data.ai_narrative || null;
 
         resultArea.innerHTML = `
             <div class="flex justify-between items-center">
@@ -346,6 +359,29 @@
                 lucide.createIcons();
             }
         } catch(e) {}
+    }
+
+    function switchTrackNarrative(lang) {
+        const narr = window.__CURRENT_ACTIVE_NARRATIVES__;
+        if (!narr) return;
+        const txt = document.getElementById('track-xai-narrative-text');
+        const btnEn = document.getElementById('track-btn-en');
+        const btnCeb = document.getElementById('track-btn-ceb');
+        if (!txt) return;
+
+        if (lang === 'ceb') {
+            txt.textContent = `"${narr.ceb || narr.en}"`;
+            btnCeb?.classList.add('bg-indigo-600', 'text-white', 'shadow-xs');
+            btnCeb?.classList.remove('text-slate-600');
+            btnEn?.classList.remove('bg-indigo-600', 'text-white', 'shadow-xs');
+            btnEn?.classList.add('text-slate-600');
+        } else {
+            txt.textContent = `"${narr.en}"`;
+            btnEn?.classList.add('bg-indigo-600', 'text-white', 'shadow-xs');
+            btnEn?.classList.remove('text-slate-600');
+            btnCeb?.classList.remove('bg-indigo-600', 'text-white', 'shadow-xs');
+            btnCeb?.classList.add('text-slate-600');
+        }
     }
 </script>
 {% endblock %}

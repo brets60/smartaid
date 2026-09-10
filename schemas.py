@@ -157,6 +157,8 @@ class AllocationResponse(BaseModel):
     household: Optional[HouseholdResponse] = None
     is_disbursed: bool = False
     disbursement: Optional[Dict[str, Any]] = None
+    ai_narrative: Optional[Dict[str, str]] = None
+    risk_analysis: Optional[Dict[str, Any]] = None
 
 # --- Disbursement Schemas ---
 class VerifyScanRequest(BaseModel):
@@ -207,6 +209,8 @@ class BeneficiaryTrackResponse(BaseModel):
     disbursed_at: Optional[datetime] = None
     budget_per_slot: Optional[float] = None
     qr_image_url: Optional[str] = None
+    ai_narrative: Optional[Dict[str, str]] = None
+    risk_analysis: Optional[Dict[str, Any]] = None
 
 # --- Announcement & Notification Schemas ---
 class AnnouncementCreate(BaseModel):
@@ -229,3 +233,21 @@ class AnnouncementResponse(BaseModel):
     recipients_count: int
     created_at: datetime
     sms_result: Optional[Dict[str, Any]] = None
+
+# --- AI Intelligence & Decision Support Schemas ---
+class AIChatRequest(BaseModel):
+    message: str
+    language: Optional[str] = "en"
+
+class AIChatResponse(BaseModel):
+    reply: str
+    suggestions: Optional[List[str]] = None
+    household: Optional[Dict[str, Any]] = None
+
+class AISimulateRequest(BaseModel):
+    scenario: str = "typhoon_flood"
+    custom_weights: Optional[Dict[str, float]] = None
+
+class AIApplyWeightsRequest(BaseModel):
+    scenario: str
+    custom_weights: Optional[Dict[str, float]] = None

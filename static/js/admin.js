@@ -179,6 +179,14 @@ function renderAllocationsTable(allocations) {
         const flags = [];
         if (hh.is_informal_settler) flags.push(`<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">Informal</span>`);
         if (hh.has_calamity_damage) flags.push(`<span class="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-medium border border-amber-200">Calamity</span>`);
+        if (a.risk_analysis) {
+            const rLevel = a.risk_analysis.risk_level;
+            if (rLevel === 'HIGH') {
+                flags.push(`<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-300" title="${(a.risk_analysis.risk_flags || []).join('; ')}">⚠️ AI: HIGH RISK</span>`);
+            } else if (rLevel === 'MEDIUM') {
+                flags.push(`<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300" title="${(a.risk_analysis.risk_flags || []).join('; ')}">AI: MED RISK</span>`);
+            }
+        }
         const flagsHtml = flags.length > 0 ? flags.join(' ') : `<span class="text-slate-300">-</span>`;
 
         return `
@@ -550,6 +558,35 @@ function openXaiDrawer(alloc) {
     document.getElementById('xai-housing-contrib').textContent = `+${(houF.weighted_contribution || 0).toFixed(4)}`;
     document.getElementById('xai-housing-bar').style.width = `${(houF.normalized_score || 0) * 100}%`;
     document.getElementById('xai-housing-desc').textContent = houF.is_informal_settler ? 'Informal Settler (Score: 1.00)' : 'Formal Residence (Score: 0.00)';
+
+    // Generative XAI Plain-Language Justification
+    window.__CURRENT_DRAWER_NARRATIVE__ = alloc.ai_narrative || null;
+    const initialLang = (localStorage.getItem('smartaid_lang') === 'ceb') ? 'ceb' : 'en';
+    const narrText = (alloc.ai_narrative && alloc.ai_narrative[initialLang]) ? alloc.ai_narrative[initialLang] : (alloc.ai_narrative?.en || 'MCDA algorithmic eligibility evaluation complete.');
+    const elNarr = document.getElementById('xai-generative-narrative');
+    if (elNarr) elNarr.textContent = `"${narrText}"`;
+    switchDrawerNarrative(initialLang);
+
+    // AI Intake Anomaly Screening
+    const risk = alloc.risk_analysis || {};
+    const riskBadge = document.getElementById('xai-risk-badge');
+    const riskFlagsList = document.getElementById('xai-risk-flags');
+    if (riskBadge) {
+        const rScore = risk.risk_score || 0;
+        const rLevel = risk.risk_level || 'LOW';
+        riskBadge.textContent = `${rLevel} RISK (${rScore}/100)`;
+        if (rLevel === 'HIGH') {
+            riskBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300';
+        } else if (rLevel === 'MEDIUM') {
+            riskBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300';
+        } else {
+            riskBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800';
+        }
+    }
+    if (riskFlagsList) {
+        const flags = risk.risk_flags || ['No anomalies detected - socioeconomic data consistent'];
+        riskFlagsList.innerHTML = flags.map(f => `<li>${f}</li>`).join('');
+    }
 
     // Decision rationale
     const dec = bd.allocation_decision || {};
@@ -1079,5 +1116,373 @@ async function openAuditTrailModal() {
 
 function closeAuditTrailModal() {
     document.getElementById('audit-modal')?.classList.add('hidden');
+}
+
+// ==========================================
+// EXPLAINABLE AI (XAI) NARRATIVE SWITCHER
+// ==========================================
+
+function switchDrawerNarrative(lang) {
+    const narr = window.__CURRENT_DRAWER_NARRATIVE__;
+    const txt = document.getElementById('xai-generative-narrative');
+    const btnEn = document.getElementById('drawer-btn-en');
+    const btnCeb = document.getElementById('drawer-btn-ceb');
+    if (!txt) return;
+
+    if (lang === 'ceb') {
+        const cebText = (narr && narr.ceb) ? narr.ceb : (narr?.en || 'Giproseso ang ebalwasyon sumala sa MCDA criteria.');
+        txt.textContent = `"${cebText}"`;
+        btnCeb?.classList.add('bg-indigo-600', 'text-white', 'shadow-2xs');
+        btnCeb?.classList.remove('text-slate-600');
+        btnEn?.classList.remove('bg-indigo-600', 'text-white', 'shadow-2xs');
+        btnEn?.classList.add('text-slate-600');
+    } else {
+        const enText = (narr && narr.en) ? narr.en : 'Evaluation computed via MCDA criteria.';
+        txt.textContent = `"${enText}"`;
+        btnEn?.classList.add('bg-indigo-600', 'text-white', 'shadow-2xs');
+        btnEn?.classList.remove('text-slate-600');
+        btnCeb?.classList.remove('bg-indigo-600', 'text-white', 'shadow-2xs');
+        btnCeb?.classList.add('text-slate-600');
+    }
+}
+
+// ==========================================
+// AI POLICY SIMULATOR & SCENARIO LAB
+// ==========================================
+
+const AI_SCENARIO_PRESETS = {
+    typhoon_flood: {
+        title: "Typhoon & Flash Flood Emergency Shock",
+        weights: { income: 0.25, dependency: 0.15, calamity: 0.45, housing: 0.15 }
+    },
+    vulnerable_sectors: {
+        title: "Senior Citizens & PWD Caregiver Focus",
+        weights: { income: 0.25, dependency: 0.45, calamity: 0.15, housing: 0.15 }
+    },
+    extreme_poverty: {
+        title: "Subsistence & Extreme Poverty Priority",
+        weights: { income: 0.50, dependency: 0.20, calamity: 0.15, housing: 0.15 }
+    },
+    balanced_equilibrium: {
+        title: "MCDA Balanced Equilibrium (Default)",
+        weights: { income: 0.35, dependency: 0.25, calamity: 0.20, housing: 0.20 }
+    }
+};
+
+let activeSimScenario = 'typhoon_flood';
+let latestSimulationResult = null;
+
+function openPolicySimulatorModal() {
+    const modal = document.getElementById('policy-simulator-modal');
+    modal?.classList.remove('hidden');
+    selectScenarioPreset('typhoon_flood');
+    lucide.createIcons();
+}
+
+function closePolicySimulatorModal() {
+    document.getElementById('policy-simulator-modal')?.classList.add('hidden');
+}
+
+function selectScenarioPreset(scenarioKey) {
+    activeSimScenario = scenarioKey;
+    const preset = AI_SCENARIO_PRESETS[scenarioKey];
+    if (!preset) return;
+
+    // Update preset card borders
+    document.querySelectorAll('.scenario-card').forEach(card => {
+        card.classList.remove('border-indigo-600', 'bg-indigo-50/50');
+        card.classList.add('border-slate-200', 'bg-white');
+    });
+
+    const activeCard = document.getElementById(`preset-card-${scenarioKey}`);
+    if (activeCard) {
+        activeCard.classList.remove('border-slate-200', 'bg-white');
+        activeCard.classList.add('border-indigo-600', 'bg-indigo-50/50');
+    }
+
+    // Update weights display
+    const w = preset.weights;
+    document.getElementById('sim-weight-inc').textContent = `Income: ${Math.round(w.income * 100)}%`;
+    document.getElementById('sim-weight-dep').textContent = `Dependents: ${Math.round(w.dependency * 100)}%`;
+    document.getElementById('sim-weight-cal').textContent = `Calamity: ${Math.round(w.calamity * 100)}%`;
+    document.getElementById('sim-weight-hou').textContent = `Housing: ${Math.round(w.housing * 100)}%`;
+
+    // Disable apply button until simulation is run
+    const applyBtn = document.getElementById('sim-apply-btn');
+    if (applyBtn) applyBtn.disabled = true;
+}
+
+async function executeSimulation() {
+    const runBtn = document.getElementById('sim-run-btn');
+    const resultsArea = document.getElementById('sim-results-area');
+    if (!resultsArea) return;
+
+    runBtn.disabled = true;
+    runBtn.innerHTML = `<span class="animate-spin inline-block mr-1">⏳</span> Simulating...`;
+
+    try {
+        const res = await fetch(`/api/v1/ai/simulate?program_id=${encodeURIComponent(currentProgramId || '')}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenario: activeSimScenario })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Simulation failed');
+        }
+
+        const data = await res.json();
+        latestSimulationResult = data;
+
+        // Render results
+        renderSimulationResults(data);
+
+        // Enable apply button
+        const applyBtn = document.getElementById('sim-apply-btn');
+        if (applyBtn) applyBtn.disabled = false;
+
+    } catch (err) {
+        resultsArea.innerHTML = `
+            <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-semibold">
+                Simulation error: ${err.message}
+            </div>
+        `;
+    } finally {
+        runBtn.disabled = false;
+        runBtn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i><span>Execute Simulation</span>`;
+        lucide.createIcons();
+    }
+}
+
+function renderSimulationResults(sim) {
+    const resultsArea = document.getElementById('sim-results-area');
+    if (!resultsArea) return;
+
+    // Barangay distribution badges
+    const bDist = sim.barangay_distribution || {};
+    const bBadges = Object.keys(bDist).map(bName => `
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-900">
+            <span>${bName}:</span>
+            <span class="font-bold text-indigo-700 font-mono">${bDist[bName]} slots</span>
+        </span>
+    `).join('') || '<span class="text-slate-400 text-xs">No allocations</span>';
+
+    // Rank shifts rows
+    const shifts = sim.significant_rank_shifts || [];
+    const shiftRows = shifts.slice(0, 8).map(s => {
+        let deltaHtml = '';
+        if (s.rank_delta > 0) {
+            deltaHtml = `<span class="inline-flex items-center text-emerald-600 font-bold font-mono">▲ +${s.rank_delta}</span>`;
+        } else if (s.rank_delta < 0) {
+            deltaHtml = `<span class="inline-flex items-center text-rose-600 font-bold font-mono">▼ ${s.rank_delta}</span>`;
+        } else {
+            deltaHtml = `<span class="text-slate-400 font-mono">0</span>`;
+        }
+
+        let statusShift = '';
+        if (s.old_status !== s.new_status) {
+            statusShift = `<span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${s.new_status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${s.old_status} → ${s.new_status}</span>`;
+        } else {
+            statusShift = `<span class="text-slate-500">${s.new_status}</span>`;
+        }
+
+        return `
+            <tr class="hover:bg-slate-50">
+                <td class="px-3 py-2 font-bold text-slate-900">${s.head_name}</td>
+                <td class="px-3 py-2 text-slate-600">${s.barangay}</td>
+                <td class="px-3 py-2 font-mono text-slate-500">#${s.old_rank || '-'}</td>
+                <td class="px-3 py-2 font-mono font-bold text-indigo-600">#${s.new_rank}</td>
+                <td class="px-3 py-2">${deltaHtml}</td>
+                <td class="px-3 py-2">${statusShift}</td>
+            </tr>
+        `;
+    }).join('') || '<tr><td colspan="6" class="text-center py-4 text-slate-400">No major rank changes under this scenario.</td></tr>';
+
+    resultsArea.innerHTML = `
+        <!-- Simulation Summary Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Evaluated Applicants</span>
+                <p class="text-lg font-black text-slate-900 mt-0.5">${sim.total_evaluated}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                <span class="text-[10px] font-bold text-emerald-700 uppercase">Simulated Approved</span>
+                <p class="text-lg font-black text-emerald-700 mt-0.5">${sim.total_approved}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                <span class="text-[10px] font-bold text-amber-700 uppercase">Simulated Waitlisted</span>
+                <p class="text-lg font-black text-amber-700 mt-0.5">${sim.total_waitlisted}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
+                <span class="text-[10px] font-bold text-rose-700 uppercase">Disqualified</span>
+                <p class="text-lg font-black text-rose-700 mt-0.5">${sim.total_disqualified}</p>
+            </div>
+        </div>
+
+        <!-- Barangay Quota Distribution -->
+        <div class="p-4 rounded-2xl bg-white border border-slate-200 space-y-2">
+            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Simulated Barangay Quota Capture</span>
+            <div class="flex flex-wrap gap-2 pt-1">
+                ${bBadges}
+            </div>
+        </div>
+
+        <!-- Significant Rank Shifts Table -->
+        <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+            <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700">Projected Priority Rank Deltas</span>
+                <span class="text-[10px] text-slate-500 font-medium">Top Rank Movements</span>
+            </div>
+            <div class="max-h-56 overflow-y-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-xs">
+                    <thead class="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Beneficiary</th>
+                            <th class="px-3 py-2 text-left">Barangay</th>
+                            <th class="px-3 py-2 text-left">Old Rank</th>
+                            <th class="px-3 py-2 text-left">New Rank</th>
+                            <th class="px-3 py-2 text-left">Rank Shift</th>
+                            <th class="px-3 py-2 text-left">Status Transition</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        ${shiftRows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    lucide.createIcons();
+}
+
+async function applySimulatedWeightsToProgram() {
+    if (!latestSimulationResult) return;
+    const btn = document.getElementById('sim-apply-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="animate-spin inline-block mr-1">⏳</span> Committing...`;
+    }
+
+    try {
+        const res = await fetch(`/api/v1/ai/apply-simulated-weights?program_id=${encodeURIComponent(currentProgramId || '')}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                scenario: activeSimScenario
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to commit weights');
+        }
+
+        const data = await res.json();
+        showToast(data.message || 'AI policy scenario weights successfully applied!');
+        closePolicySimulatorModal();
+
+        // Refresh live dashboard allocations
+        if (currentProgramId) {
+            loadProgramData(currentProgramId);
+        }
+    } catch (err) {
+        alert(`Error applying weights: ${err.message}`);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="check-check" class="w-4 h-4"></i><span>Apply Optimal Weights to Program</span>`;
+            lucide.createIcons();
+        }
+    }
+}
+
+// ==========================================
+// AI INTAKE ANOMALY & FRAUD DETECTION
+// ==========================================
+
+async function openRiskAnalysisModal() {
+    const modal = document.getElementById('risk-analysis-modal');
+    modal?.classList.remove('hidden');
+    lucide.createIcons();
+
+    const tbody = document.getElementById('risk-table-body');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">Loading risk screening...</td></tr>`;
+    }
+
+    try {
+        const res = await fetch('/api/v1/ai/risk-analysis');
+        if (!res.ok) throw new Error('Failed to run intake risk analysis');
+        const data = await res.json();
+
+        // Update statistics
+        const summary = data.summary || {};
+        document.getElementById('risk-stat-total').textContent = summary.total || 0;
+        document.getElementById('risk-stat-low').textContent = summary.LOW || 0;
+        document.getElementById('risk-stat-med').textContent = summary.MEDIUM || 0;
+        document.getElementById('risk-stat-high').textContent = summary.HIGH || 0;
+        document.getElementById('risk-flagged-badge').textContent = `${data.flagged_count || 0} flagged applicant(s)`;
+
+        // Update table
+        const flagged = data.flagged_records || [];
+        if (flagged.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="py-8 text-center text-slate-500">
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        </div>
+                        <p class="font-bold text-slate-800">Registry Verified Clean</p>
+                        <p class="text-slate-400 text-xs mt-0.5">No recycled numbers or suspicious income declarations detected.</p>
+                    </td>
+                </tr>
+            `;
+            lucide.createIcons();
+            return;
+        }
+
+        tbody.innerHTML = flagged.map(r => {
+            const isHigh = (r.risk_level === 'HIGH');
+            const badgeClass = isHigh ?
+                'bg-rose-100 text-rose-800 border-rose-200' :
+                'bg-amber-100 text-amber-800 border-amber-200';
+
+            const flagsList = (r.risk_flags || []).map(f => `<li>${f}</li>`).join('');
+
+            return `
+                <tr class="hover:bg-slate-50">
+                    <td class="px-3 py-2.5">
+                        <div class="font-bold text-slate-900">${r.head_name}</div>
+                        <div class="font-mono text-[10.5px] text-slate-400">${r.reference_number}</div>
+                    </td>
+                    <td class="px-3 py-2.5 text-slate-600">${r.barangay}</td>
+                    <td class="px-3 py-2.5 font-mono text-slate-700">
+                        ₱${(r.monthly_income || 0).toLocaleString()} (${r.member_count} members)
+                    </td>
+                    <td class="px-3 py-2.5">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">
+                            ${r.risk_level} (${r.risk_score} pts)
+                        </span>
+                    </td>
+                    <td class="px-3 py-2.5 text-slate-600">
+                        <ul class="list-disc list-inside text-[11px] text-rose-700 space-y-0.5 font-medium">
+                            ${flagsList}
+                        </ul>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        lucide.createIcons();
+
+    } catch (err) {
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500 font-semibold">${err.message}</td></tr>`;
+        }
+    }
+}
+
+function closeRiskAnalysisModal() {
+    document.getElementById('risk-analysis-modal')?.classList.add('hidden');
 }
 

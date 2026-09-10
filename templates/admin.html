@@ -51,6 +51,22 @@
                 <span>Broadcast SMS & Notices</span>
             </button>
 
+            <!-- AI Policy Simulator & Scenario Lab (Admin / Social Worker only) -->
+            {% if not current_user or current_user.role != 'barangay_staff' %}
+            <button onclick="openPolicySimulatorModal()"
+                class="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-600/20 transition-all" title="Simulate disaster shocks and criteria adjustments without mutating live records">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+                <span>AI Policy Simulator</span>
+            </button>
+            {% endif %}
+
+            <!-- AI Risk Screening Button -->
+            <button onclick="openRiskAnalysisModal()"
+                class="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm transition-all" title="View intake fraud detection and anomaly screening">
+                <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-rose-600"></i>
+                <span>AI Risk Screening</span>
+            </button>
+
             <!-- Export Masterlist CSV Button -->
             <button onclick="exportMasterlistCSV()"
                 class="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm transition-all" title="Export COA-Compliant Masterlist (Excel / CSV)">
@@ -811,11 +827,44 @@
                     </div>
                 </div>
 
+                <!-- Generative XAI Plain-Language Justification (EN / CEB) -->
+                <div class="p-4 rounded-xl bg-gradient-to-br from-indigo-50/90 via-purple-50/30 to-slate-50 border border-indigo-100 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5 text-[11px] font-bold text-indigo-950 uppercase">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                            <span>Plain-Language AI Justification</span>
+                        </div>
+                        <div class="inline-flex rounded-lg p-0.5 bg-white/80 border border-indigo-100 text-[10px] font-bold">
+                            <button type="button" onclick="switchDrawerNarrative('en')" id="drawer-btn-en" class="px-2 py-0.5 rounded bg-indigo-600 text-white shadow-2xs">EN</button>
+                            <button type="button" onclick="switchDrawerNarrative('ceb')" id="drawer-btn-ceb" class="px-2 py-0.5 rounded text-slate-600 hover:text-slate-900">CEB</button>
+                        </div>
+                    </div>
+                    <p id="xai-generative-narrative" class="text-xs text-slate-700 leading-relaxed italic bg-white/80 p-3 rounded-lg border border-indigo-100/70">
+                        Loading generative narrative...
+                    </p>
+                </div>
+
+                <!-- AI Intake Anomaly & Risk Evaluation -->
+                <div id="xai-risk-panel" class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                            <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-slate-600"></i>
+                            AI Intake Anomaly Screening
+                        </span>
+                        <span id="xai-risk-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            LOW RISK (0/100)
+                        </span>
+                    </div>
+                    <ul id="xai-risk-flags" class="list-disc list-inside text-xs text-slate-600 space-y-1 pl-1">
+                        <li>No anomalies detected</li>
+                    </ul>
+                </div>
+
                 <!-- Allocation Decision Rationale -->
                 <div class="p-4 rounded-xl border border-indigo-100 bg-indigo-50/50 space-y-1">
                     <p class="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Algorithm Allocation Rationale</p>
                     <p id="xai-decision-rationale" class="text-xs text-indigo-800 leading-relaxed">
-                        Ranked #1 within program quota limit. Tie-breaking rules and hard screening passed.
+                        Ranked within program quota limit. Tie-breaking rules and hard screening passed.
                     </p>
                 </div>
 
@@ -877,6 +926,207 @@
                     Close
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: AI POLICY SIMULATOR & SCENARIO LAB -->
+<!-- ========================================================================= -->
+<div id="policy-simulator-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closePolicySimulatorModal()"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 my-8 animate-scale-in space-y-6">
+            
+            <!-- Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/25">
+                        <i data-lucide="sparkles" class="w-6 h-6 text-amber-300"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-extrabold text-slate-900 text-lg sm:text-xl">AI Policy Simulator & Scenario Lab</h3>
+                            <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                In-Memory Sandbox
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500">Simulate disaster shocks and criteria adjustments without mutating live beneficiary records</p>
+                    </div>
+                </div>
+                <button onclick="closePolicySimulatorModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Scenario Preset Cards -->
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Select Policy Shock Scenario</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <!-- Scenario 1: Typhoon & Flash Flood -->
+                    <button type="button" onclick="selectScenarioPreset('typhoon_flood')" id="preset-card-typhoon_flood" class="scenario-card text-left p-3.5 rounded-2xl border-2 border-indigo-600 bg-indigo-50/50 shadow-xs transition-all">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-black text-indigo-950">🌪️ Typhoon & Flood</span>
+                            <span class="px-1.5 py-0.5 rounded bg-indigo-200/80 text-[10px] font-bold text-indigo-900">45% Calamity</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600 leading-snug">Prioritizes riverside & flood basin barangays (Panadtalan, Base Camp, Kuya).</p>
+                    </button>
+
+                    <!-- Scenario 2: Senior / PWD Caregiver Focus -->
+                    <button type="button" onclick="selectScenarioPreset('vulnerable_sectors')" id="preset-card-vulnerable_sectors" class="scenario-card text-left p-3.5 rounded-2xl border-2 border-slate-200 hover:border-purple-300 bg-white shadow-xs transition-all">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-black text-slate-900">👵 Senior & PWD</span>
+                            <span class="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-700">45% Dependents</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600 leading-snug">Maximizes demographic dependency ratio for multi-generational families.</p>
+                    </button>
+
+                    <!-- Scenario 3: Extreme Poverty -->
+                    <button type="button" onclick="selectScenarioPreset('extreme_poverty')" id="preset-card-extreme_poverty" class="scenario-card text-left p-3.5 rounded-2xl border-2 border-slate-200 hover:border-purple-300 bg-white shadow-xs transition-all">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-black text-slate-900">📉 Extreme Poverty</span>
+                            <span class="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-700">50% Income</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600 leading-snug">Heavily weights income deficit for ₱0-income casual workers.</p>
+                    </button>
+
+                    <!-- Scenario 4: Balanced Equilibrium -->
+                    <button type="button" onclick="selectScenarioPreset('balanced_equilibrium')" id="preset-card-balanced_equilibrium" class="scenario-card text-left p-3.5 rounded-2xl border-2 border-slate-200 hover:border-purple-300 bg-white shadow-xs transition-all">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-black text-slate-900">⚖️ Balanced MCDA</span>
+                            <span class="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-700">Equilibrium</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600 leading-snug">Default balanced distribution across all 20 Maramag barangays.</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Run Simulation Button & Active Weights Preview -->
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-xs text-slate-600 flex flex-wrap items-center gap-2.5">
+                    <span class="font-bold text-slate-900">Scenario Weights:</span>
+                    <span id="sim-weight-inc" class="px-2 py-0.5 bg-white border border-slate-200 rounded font-mono font-bold text-indigo-600">Income: 25%</span>
+                    <span id="sim-weight-dep" class="px-2 py-0.5 bg-white border border-slate-200 rounded font-mono font-bold text-purple-600">Dependents: 15%</span>
+                    <span id="sim-weight-cal" class="px-2 py-0.5 bg-white border border-slate-200 rounded font-mono font-bold text-amber-600">Calamity: 45%</span>
+                    <span id="sim-weight-hou" class="px-2 py-0.5 bg-white border border-slate-200 rounded font-mono font-bold text-emerald-600">Housing: 15%</span>
+                </div>
+                <button type="button" onclick="executeSimulation()" id="sim-run-btn" class="btn-press px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 transition-all flex items-center gap-2 flex-shrink-0">
+                    <i data-lucide="play" class="w-4 h-4"></i>
+                    <span>Execute Simulation</span>
+                </button>
+            </div>
+
+            <!-- Simulation Results Output Container -->
+            <div id="sim-results-area" class="space-y-4">
+                <div class="text-center py-8 text-slate-400 text-xs">
+                    Select a scenario above and click <strong>Execute Simulation</strong> to preview rank shifts and barangay distribution impact.
+                </div>
+            </div>
+
+            <!-- Footer with Apply Option -->
+            <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p class="text-[11px] text-slate-400 leading-tight">
+                    Applying weights permanently updates the active program rules and re-evaluates all rankings in the registry.
+                </p>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="closePolicySimulatorModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all">
+                        Cancel
+                    </button>
+                    {% if current_user and current_user.role == 'admin' %}
+                    <button type="button" onclick="applySimulatedWeightsToProgram()" id="sim-apply-btn" disabled class="btn-press px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5">
+                        <i data-lucide="check-check" class="w-4 h-4"></i>
+                        <span>Apply Optimal Weights to Program</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: AI INTAKE ANOMALY & FRAUD DETECTION SCREENING -->
+<!-- ========================================================================= -->
+<div id="risk-analysis-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeRiskAnalysisModal()"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 my-8 animate-scale-in space-y-6">
+            
+            <!-- Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/25">
+                        <i data-lucide="shield-alert" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-extrabold text-slate-900 text-lg sm:text-xl">AI Intake Anomaly & Fraud Screening</h3>
+                            <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                Integrity Guard
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500">Real-time heuristics for recycled contact numbers, suspicious ₱0 declarations, and address clusters</p>
+                    </div>
+                </div>
+                <button onclick="closeRiskAnalysisModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Risk Stat Summary Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Screened Applicants</span>
+                    <p id="risk-stat-total" class="text-xl font-black text-slate-900 mt-0.5">--</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase">Low Risk (Clean)</span>
+                    <p id="risk-stat-low" class="text-xl font-black text-emerald-700 mt-0.5">--</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                    <span class="text-[10px] font-bold text-amber-600 uppercase">Medium Risk (Warning)</span>
+                    <p id="risk-stat-med" class="text-xl font-black text-amber-700 mt-0.5">--</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+                    <span class="text-[10px] font-bold text-rose-600 uppercase">High Risk (Flagged)</span>
+                    <p id="risk-stat-high" class="text-xl font-black text-rose-700 mt-0.5">--</p>
+                </div>
+            </div>
+
+            <!-- Flagged Records Table -->
+            <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-700">Flagged Intake Records (Requires Social Worker Verification)</span>
+                    <span id="risk-flagged-badge" class="text-[11px] font-semibold text-slate-500">0 records</span>
+                </div>
+                <div class="max-h-72 overflow-y-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead class="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider text-[10px] sticky top-0">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Applicant / Ref</th>
+                                <th class="px-3 py-2 text-left">Barangay</th>
+                                <th class="px-3 py-2 text-left">Income & Size</th>
+                                <th class="px-3 py-2 text-left">Risk Level</th>
+                                <th class="px-3 py-2 text-left">Anomaly Reasons</th>
+                            </tr>
+                        </thead>
+                        <tbody id="risk-table-body" class="divide-y divide-slate-100 bg-white">
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-slate-400">Loading risk screening...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="pt-3 border-t border-slate-100 flex justify-end">
+                <button type="button" onclick="closeRiskAnalysisModal()" class="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-all">
+                    Close Screening
+                </button>
+            </div>
+
         </div>
     </div>
 </div>

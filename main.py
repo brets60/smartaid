@@ -44,7 +44,8 @@ from schemas import (
     HouseholdCreate, HouseholdResponse, HouseholdUpdate,
     AidProgramCreate, AidProgramResponse, ProgramRuleCreate, ProgramRuleUpdate, ProgramRuleResponse,
     AllocationResponse, VerifyScanRequest, DisbursementResponse, BeneficiaryTrackResponse,
-    AnnouncementCreate, AnnouncementResponse, AuditLogResponse
+    AnnouncementCreate, AnnouncementResponse, AuditLogResponse,
+    AIChatRequest, AIChatResponse, AISimulateRequest, AIApplyWeightsRequest
 )
 from auth import (
     verify_password, get_password_hash, create_access_token,
@@ -53,6 +54,13 @@ from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from engine import MCDAEngine
+from ai_engine import (
+    SmartAidAICopilot,
+    generate_xai_narrative,
+    evaluate_intake_risk,
+    simulate_policy_scenario,
+    SCENARIOS
+)
 
 # Ensure tables exist
 Base.metadata.create_all(bind=engine)
@@ -673,6 +681,8 @@ async def track_beneficiary(reference_number: str, db: Session = Depends(get_db)
         .first()
     )
 
+    risk_info = evaluate_intake_risk(db, household)
+
     if not allocation:
         return BeneficiaryTrackResponse(
             reference_number=household.reference_number,
@@ -690,13 +700,20 @@ async def track_beneficiary(reference_number: str, db: Session = Depends(get_db)
             is_disbursed=False,
             disbursed_at=None,
             budget_per_slot=None,
-            qr_image_url=None
+            qr_image_url=None,
+            ai_narrative={
+                "en": "Application is pending official criteria evaluation by municipal social welfare officers.",
+                "ceb": "Giproseso pa ang opisyal nga ebalwasyon sa aplikasyon sa buhatan sa MSWDO."
+            },
+            risk_analysis=risk_info
         )
 
     program = allocation.program
     is_disbursed = allocation.disbursement is not None
     disbursed_at = allocation.disbursement.disbursed_at if is_disbursed else None
     qr_url = f"/api/v1/qr/{allocation.claim_qr_hash}" if allocation.claim_qr_hash else None
+    rules = program.rules if program else None
+    narrative = generate_xai_narrative(allocation, household, rules)
 
     return BeneficiaryTrackResponse(
         reference_number=household.reference_number,
@@ -716,7 +733,9 @@ async def track_beneficiary(reference_number: str, db: Session = Depends(get_db)
         is_disbursed=is_disbursed,
         disbursed_at=disbursed_at,
         budget_per_slot=program.budget_per_slot if program else 0.0,
-        qr_image_url=qr_url
+        qr_image_url=qr_url,
+        ai_narrative=narrative,
+        risk_analysis=risk_info
     )
 
 # ==========================================
@@ -766,6 +785,11 @@ async def get_program_allocations(
     allocations.sort(key=sort_key)
 
     results = []
+    rules = None
+    first_alloc = allocations[0] if allocations else None
+    if first_alloc and first_alloc.program:
+        rules = first_alloc.program.rules
+
     for a in allocations:
         is_disb = a.disbursement is not None
         disb_data = None
@@ -776,6 +800,10 @@ async def get_program_allocations(
                 "notes": a.disbursement.notes,
                 "has_signature": bool(a.disbursement.signature_data)
             }
+
+        hh = a.household
+        ai_narrative = generate_xai_narrative(a, hh, rules) if hh else None
+        risk = evaluate_intake_risk(db, hh) if hh else None
 
         a_dict = {
             "id": a.id,
@@ -789,7 +817,9 @@ async def get_program_allocations(
             "allocated_at": a.allocated_at,
             "household": a.household,
             "is_disbursed": is_disb,
-            "disbursement": disb_data
+            "disbursement": disb_data,
+            "ai_narrative": ai_narrative,
+            "risk_analysis": risk
         }
         results.append(a_dict)
 
@@ -1234,6 +1264,165 @@ async def list_audit_logs(
     current_user: User = Depends(require_admin)
 ):
     return db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
+
+# ==========================================
+# REST API V1: SMARTAID AI & DECISION INTELLIGENCE
+# ==========================================
+
+@app.post("/api/v1/ai/chat", response_model=AIChatResponse)
+async def ai_copilot_chat(
+    payload: AIChatRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Bilingual (EN / CEB) context-aware conversational copilot.
+    Grounds answers on live registry lookups, poverty thresholds, and Maramag welfare criteria.
+    """
+    result = SmartAidAICopilot.chat(payload.message, db, language=payload.language or "en")
+    return AIChatResponse(
+        reply=result["reply"],
+        suggestions=result.get("suggestions"),
+        household=result.get("household")
+    )
+
+@app.post("/api/v1/ai/simulate")
+async def ai_simulate_scenario(
+    payload: AISimulateRequest,
+    program_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_agent_or_above)
+):
+    """
+    In-memory scenario simulation lab. Recomputes MCDA rankings and barangay allocations
+    without mutating the live database.
+    """
+    if not program_id:
+        prog = db.query(AidProgram).filter(AidProgram.status == "Active").first()
+        if not prog:
+            prog = db.query(AidProgram).first()
+        if not prog:
+            raise HTTPException(status_code=404, detail="No aid program found to simulate.")
+        program_id = prog.id
+
+    try:
+        return simulate_policy_scenario(db, program_id, payload.scenario, payload.custom_weights)
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Simulation error: {str(e)}")
+
+@app.post("/api/v1/ai/apply-simulated-weights")
+async def ai_apply_simulated_weights(
+    payload: AIApplyWeightsRequest,
+    program_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """
+    Commits simulated scenario weights to an active program's rules, triggers full MCDA re-evaluation,
+    and logs an auditable governance trail event.
+    """
+    if not program_id:
+        prog = db.query(AidProgram).filter(AidProgram.status == "Active").first()
+        if not prog:
+            prog = db.query(AidProgram).first()
+        if not prog:
+            raise HTTPException(status_code=404, detail="No aid program found.")
+        program_id = prog.id
+    else:
+        prog = db.query(AidProgram).filter(AidProgram.id == program_id).first()
+        if not prog:
+            raise HTTPException(status_code=404, detail="Program not found.")
+
+    scenario_info = SCENARIOS.get(payload.scenario)
+    if scenario_info:
+        weights = scenario_info["weights"]
+    elif payload.custom_weights:
+        weights = payload.custom_weights
+    else:
+        raise HTTPException(status_code=400, detail="Invalid scenario or custom weights provided.")
+
+    if not prog.rules:
+        rule = ProgramRule(
+            program_id=prog.id,
+            income_ceiling=15000.0,
+            weight_income=weights.get("income", 0.35),
+            weight_dependency=weights.get("dependency", 0.25),
+            weight_calamity=weights.get("calamity", 0.20),
+            weight_housing=weights.get("housing", 0.20),
+            cooldown_days=14
+        )
+        db.add(rule)
+    else:
+        prog.rules.weight_income = weights.get("income", 0.35)
+        prog.rules.weight_dependency = weights.get("dependency", 0.25)
+        prog.rules.weight_calamity = weights.get("calamity", 0.20)
+        prog.rules.weight_housing = weights.get("housing", 0.20)
+
+    db.commit()
+    db.refresh(prog)
+
+    # Re-evaluate
+    engine_inst = MCDAEngine(db)
+    eval_result = engine_inst.evaluate_program(prog.id)
+
+    log_audit_event(
+        db=db,
+        action="AI_POLICY_WEIGHTS_APPLIED",
+        target_entity="AidProgram",
+        target_id=prog.id,
+        details={
+            "scenario": payload.scenario,
+            "weights": weights,
+            "eval_result": eval_result
+        },
+        user=current_user
+    )
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Successfully applied AI policy weights for scenario '{payload.scenario}' to {prog.program_name}.",
+        "weights": weights,
+        "eval_result": eval_result
+    }
+
+@app.get("/api/v1/ai/risk-analysis")
+async def ai_registry_risk_analysis(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_worker_or_barangay)
+):
+    """
+    Runs real-time anomaly detection across registered applicant households to detect
+    recycled contact numbers, suspicious ₱0 income declarations, and address clustering.
+    """
+    households = db.query(Household).all()
+    results = []
+    summary = {"total": 0, "LOW": 0, "MEDIUM": 0, "HIGH": 0}
+    for h in households:
+        if current_user.role == "barangay_staff" and current_user.assigned_barangay and h.barangay != current_user.assigned_barangay:
+            continue
+        summary["total"] += 1
+        r = evaluate_intake_risk(db, h)
+        summary[r["risk_level"]] += 1
+        if r["risk_level"] in ("MEDIUM", "HIGH"):
+            results.append({
+                "household_id": h.id,
+                "reference_number": h.reference_number,
+                "head_name": h.head_name,
+                "barangay": h.barangay,
+                "contact_number": h.contact_number,
+                "monthly_income": h.monthly_income,
+                "member_count": h.member_count,
+                "risk_score": r["risk_score"],
+                "risk_level": r["risk_level"],
+                "risk_flags": r["risk_flags"]
+            })
+    results.sort(key=lambda x: x["risk_score"], reverse=True)
+    return {
+        "summary": summary,
+        "flagged_count": len(results),
+        "flagged_records": results
+    }
 
 if __name__ == "__main__":
     import uvicorn
