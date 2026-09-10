@@ -418,8 +418,17 @@ async def update_program_rules(
     if rules_in.cooldown_days is not None:
         rules.cooldown_days = rules_in.cooldown_days
 
+    program = db.query(AidProgram).filter(AidProgram.id == program_id).first()
+    if program:
+        if rules_in.total_quota_slots is not None and rules_in.total_quota_slots > 0:
+            program.total_quota_slots = rules_in.total_quota_slots
+        if rules_in.budget_per_slot is not None and rules_in.budget_per_slot >= 0:
+            program.budget_per_slot = rules_in.budget_per_slot
+
     db.commit()
     db.refresh(rules)
+    if program:
+        db.refresh(program)
 
     log_audit_event(
         db,
@@ -432,7 +441,9 @@ async def update_program_rules(
             "weight_dependency": rules.weight_dependency,
             "weight_calamity": rules.weight_calamity,
             "weight_housing": rules.weight_housing,
-            "income_ceiling": rules.income_ceiling
+            "income_ceiling": rules.income_ceiling,
+            "total_quota_slots": program.total_quota_slots if program else None,
+            "budget_per_slot": program.budget_per_slot if program else None
         },
         user=current_user
     )

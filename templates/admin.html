@@ -752,6 +752,26 @@
                     </div>
                 </div>
 
+                <!-- Program Capacity Quota & Budget -->
+                <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">
+                            Total Quota Limit (Slots) *
+                        </label>
+                        <input type="number" id="input-quota" value="10" min="1" max="10000" required
+                            class="mt-1 block w-full px-3 py-1.5 border border-indigo-200 bg-indigo-50/40 rounded-lg text-xs font-mono font-bold text-indigo-700 focus:ring-indigo-500">
+                        <p class="text-[10.5px] text-slate-400 mt-0.5">Top N highest VPI households approved.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700">
+                            Budget Per Slot (₱) *
+                        </label>
+                        <input type="number" id="input-budget-slot" value="5000" min="0" step="500" required
+                            class="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-indigo-500">
+                        <p class="text-[10.5px] text-slate-400 mt-0.5">Aid package value per household.</p>
+                    </div>
+                </div>
+
                 <!-- Total Weight Sum Indicator -->
                 <div class="p-3 rounded-lg flex items-center justify-between border" id="weight-sum-box">
                     <span class="text-xs font-semibold">Total Weight Sum:</span>

@@ -53,7 +53,7 @@ async function loadProgramData(programId, silent = false) {
         if (pRes.ok) {
             updateDashboardMetrics(program);
             currentProgramRules = program.rules;
-            populateWeightModalValues(program.rules);
+            populateWeightModalValues(program.rules, program);
             const titleEl = document.getElementById('active-program-name-display');
             if (titleEl) titleEl.textContent = program.program_name;
         }
@@ -146,8 +146,9 @@ function updateDashboardMetrics(program) {
     }
 
     const quotaPct = Math.min(100, Math.round((approvedCount / quota) * 100));
+    const remainingSlots = Math.max(0, quota - approvedCount);
     const elQuotaUtil = document.getElementById('stat-quota-util');
-    if (elQuotaUtil) elQuotaUtil.textContent = `${quotaPct}% of ${quota} quota filled`;
+    if (elQuotaUtil) elQuotaUtil.textContent = `${approvedCount} of ${quota} slots allocated (${remainingSlots} remaining)`;
     
     const pctDisb = approvedCount > 0 ? Math.round((disbursedCount / approvedCount) * 100) : 0;
     const elDisbPct = document.getElementById('stat-disbursed-pct');
@@ -158,7 +159,7 @@ function updateDashboardMetrics(program) {
 
     // Progress bar animations
     const pQuota = document.getElementById('stat-quota-progress');
-    if (pQuota) pQuota.style.width = '100%';
+    if (pQuota) pQuota.style.width = `${quotaPct}%`;
     const pApproved = document.getElementById('stat-approved-progress');
     if (pApproved) pApproved.style.width = `${quotaPct}%`;
     const pDisb = document.getElementById('stat-disbursed-progress');
@@ -738,7 +739,7 @@ function closeWeightModal() {
     document.getElementById('weight-modal').classList.add('hidden');
 }
 
-function populateWeightModalValues(rules) {
+function populateWeightModalValues(rules, program) {
     if (!rules) return;
     const wInc = Math.round(rules.weight_income * 100);
     const wDep = Math.round(rules.weight_dependency * 100);
@@ -757,6 +758,15 @@ function populateWeightModalValues(rules) {
 
     document.getElementById('input-ceiling').value = rules.income_ceiling;
     document.getElementById('input-cooldown').value = rules.cooldown_days;
+
+    const qInput = document.getElementById('input-quota');
+    if (qInput && program) {
+        qInput.value = program.total_quota_slots || program.quota_limit || 10;
+    }
+    const bInput = document.getElementById('input-budget-slot');
+    if (bInput && program) {
+        bInput.value = program.budget_per_slot || 5000;
+    }
 
     checkWeightSum();
 }
@@ -831,6 +841,8 @@ async function saveCriteriaWeights(e) {
     const hou = parseInt(document.getElementById('slider-housing').value) / 100;
     const ceiling = parseFloat(document.getElementById('input-ceiling').value);
     const cooldown = parseInt(document.getElementById('input-cooldown').value);
+    const quota = parseInt(document.getElementById('input-quota')?.value) || 10;
+    const budgetSlot = parseFloat(document.getElementById('input-budget-slot')?.value) || 5000;
 
     try {
         const res = await fetch(`/api/v1/programs/${currentProgramId}/rules`, {
@@ -842,12 +854,15 @@ async function saveCriteriaWeights(e) {
                 weight_calamity: cal,
                 weight_housing: hou,
                 income_ceiling: ceiling,
-                cooldown_days: cooldown
+                cooldown_days: cooldown,
+                total_quota_slots: quota,
+                budget_per_slot: budgetSlot
             })
         });
 
         if (res.ok) {
             closeWeightModal();
+            showToast(`Program settings updated! Quota set to ${quota} slots.`);
             await triggerEvaluation();
         } else {
             const err = await res.json();

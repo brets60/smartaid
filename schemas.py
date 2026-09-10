@@ -109,6 +109,8 @@ class ProgramRuleUpdate(BaseModel):
     weight_calamity: Optional[float] = None
     weight_housing: Optional[float] = None
     cooldown_days: Optional[int] = None
+    total_quota_slots: Optional[int] = None
+    budget_per_slot: Optional[float] = None
 
 class ProgramRuleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
