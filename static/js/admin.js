@@ -84,6 +84,30 @@ function renderAllocationsTable(allocations) {
         return;
     }
 
+    // Update demographic vulnerability breakdown counts
+    let totalSeniors = 0;
+    let totalPwds = 0;
+    let totalCalamity = 0;
+    let totalInformal = 0;
+
+    allocations.forEach(a => {
+        const hh = a.household || {};
+        totalSeniors += (hh.elderly_count || 0);
+        totalPwds += (hh.pwd_count || 0);
+        if (hh.has_calamity_damage) totalCalamity++;
+        if (hh.is_informal_settler) totalInformal++;
+    });
+
+    const elSeniors = document.getElementById('demo-seniors-count');
+    const elPwds = document.getElementById('demo-pwds-count');
+    const elCalamity = document.getElementById('demo-calamity-count');
+    const elInformal = document.getElementById('demo-informal-count');
+
+    if (elSeniors) elSeniors.textContent = `${totalSeniors} Seniors`;
+    if (elPwds) elPwds.textContent = `${totalPwds} PWDs`;
+    if (elCalamity) elCalamity.textContent = `${totalCalamity} Families`;
+    if (elInformal) elInformal.textContent = `${totalInformal} Settlers`;
+
     const searchVal = document.getElementById('table-search')?.value.toLowerCase().trim() || '';
 
     const filtered = allocations.filter(a => {
@@ -991,3 +1015,69 @@ async function deleteHouseholdRecord() {
         lucide.createIcons();
     }
 }
+
+// ==========================================
+// OFFICIAL COA-COMPLIANT MASTERLIST EXPORT
+// ==========================================
+
+function exportMasterlistCSV() {
+    const progId = currentProgramId || '';
+    const brgySelect = document.getElementById('brgy-filter-select');
+    const brgy = brgySelect ? brgySelect.value : 'All';
+    const stat = currentStatusFilter || 'All';
+
+    const url = `/api/v1/reports/allocations/export?program_id=${encodeURIComponent(progId)}&barangay=${encodeURIComponent(brgy)}&status=${encodeURIComponent(stat)}`;
+    window.open(url, '_blank');
+}
+
+// ==========================================
+// SYSTEM AUDIT TRAIL MODAL
+// ==========================================
+
+async function openAuditTrailModal() {
+    const modal = document.getElementById('audit-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    lucide.createIcons();
+    
+    const tbody = document.getElementById('audit-trail-table-body');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">Loading audit events...</td></tr>`;
+
+    try {
+        const res = await fetch('/api/v1/audit-logs?limit=50');
+        if (!res.ok) throw new Error('Failed to load audit logs');
+        const logs = await res.json();
+        if (!logs.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">No audit events recorded yet.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = logs.map(l => {
+            const dt = new Date(l.created_at).toLocaleString();
+            let actionBadge = 'bg-slate-100 text-slate-700';
+            if (l.action.includes('DISBURSE')) actionBadge = 'bg-emerald-100 text-emerald-800';
+            else if (l.action.includes('WEIGHTS')) actionBadge = 'bg-indigo-100 text-indigo-800';
+            else if (l.action.includes('DELETE')) actionBadge = 'bg-rose-100 text-rose-800';
+            else if (l.action.includes('INTAKE')) actionBadge = 'bg-blue-100 text-blue-800';
+
+            const detailStr = l.details ? JSON.stringify(l.details) : '-';
+
+            return `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${dt}</td>
+                    <td class="px-3 py-2 font-bold text-slate-800">${l.username}</td>
+                    <td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${actionBadge}">${l.action}</span></td>
+                    <td class="px-3 py-2 text-slate-600">${l.target_entity}</td>
+                    <td class="px-3 py-2 text-slate-500 max-w-xs truncate" title="${detailStr}">${detailStr}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch(err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-rose-500 font-semibold">${err.message}</td></tr>`;
+    }
+}
+
+function closeAuditTrailModal() {
+    document.getElementById('audit-modal')?.classList.add('hidden');
+}
+

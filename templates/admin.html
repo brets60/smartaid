@@ -51,6 +51,22 @@
                 <span>Broadcast SMS & Notices</span>
             </button>
 
+            <!-- Export Masterlist CSV Button -->
+            <button onclick="exportMasterlistCSV()"
+                class="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm transition-all" title="Export COA-Compliant Masterlist (Excel / CSV)">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>Export Masterlist</span>
+            </button>
+
+            <!-- System Audit Trail Button (Admin only) -->
+            {% if current_user and current_user.role == 'admin' %}
+            <button onclick="openAuditTrailModal()"
+                class="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm transition-all" title="View System Audit Trail & Governance Log">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span>Audit Trail</span>
+            </button>
+            {% endif %}
+
             <!-- Reset Households Button (Admin only) -->
             {% if current_user and current_user.role == 'admin' %}
             <button onclick="confirmResetHouseholds()"
@@ -119,6 +135,56 @@
             </div>
             <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 text-white flex items-center justify-center shadow-lg shadow-amber-500/25 group-hover:scale-105 transition-transform">
                 <i data-lucide="coins" class="w-6 h-6"></i>
+            </div>
+    </div>
+
+    <!-- Demographic & Vulnerability Analytics Quick-Glance Panel -->
+    <div class="glass-panel p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80 animate-slide-up delay-100 space-y-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                </div>
+                <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Demographic Vulnerability Breakdown (Maramag Registry)</h3>
+            </div>
+            <span class="text-[11px] font-medium text-slate-500">Auto-aggregated across registered households</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Senior Citizens</span>
+                    <p id="demo-seniors-count" class="font-extrabold text-slate-900 text-sm">--</p>
+                </div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="accessibility" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">PWD Members</span>
+                    <p id="demo-pwds-count" class="font-extrabold text-slate-900 text-sm">--</p>
+                </div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="waves" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Calamity Damaged</span>
+                    <p id="demo-calamity-count" class="font-extrabold text-slate-900 text-sm">--</p>
+                </div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Informal Settlers</span>
+                    <p id="demo-informal-count" class="font-extrabold text-slate-900 text-sm">--</p>
+                </div>
             </div>
         </div>
     </div>
@@ -762,6 +828,55 @@
                 </button>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: SYSTEM AUDIT TRAIL & GOVERNANCE LOG -->
+<!-- ========================================================================= -->
+<div id="audit-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeAuditTrailModal()"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 my-8 animate-scale-in">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shadow-xs">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">System Audit Trail & Governance Log</h3>
+                        <p class="text-xs text-slate-500">Chronological record of administrative operations, re-weighting, and disbursements</p>
+                    </div>
+                </div>
+                <button onclick="closeAuditTrailModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="mt-4 max-h-96 overflow-y-auto border border-slate-200 rounded-xl">
+                <table class="min-w-full divide-y divide-slate-200 text-xs">
+                    <thead class="bg-slate-50 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2.5 text-left font-bold text-slate-500 uppercase">Timestamp</th>
+                            <th class="px-3 py-2.5 text-left font-bold text-slate-500 uppercase">User</th>
+                            <th class="px-3 py-2.5 text-left font-bold text-slate-500 uppercase">Action</th>
+                            <th class="px-3 py-2.5 text-left font-bold text-slate-500 uppercase">Entity</th>
+                            <th class="px-3 py-2.5 text-left font-bold text-slate-500 uppercase">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-trail-table-body" class="divide-y divide-slate-100 bg-white font-mono text-[11px]">
+                        <tr><td colspan="5" class="text-center py-6 text-slate-400">Loading audit events...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Tamper-resistant audit events recorded with IP addresses.</span>
+                <button type="button" onclick="closeAuditTrailModal()" class="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all">
+                    Close
+                </button>
+            </div>
         </div>
     </div>
 </div>

@@ -121,6 +121,7 @@ class Disbursement(Base):
     allocation_id = Column(String(36), ForeignKey("allocations.id", ondelete="CASCADE"), unique=True, nullable=False)
     verified_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     notes = Column(Text, nullable=True)
+    signature_data = Column(Text, nullable=True)  # Base64 data URL of digital signature
     disbursed_at = Column(DateTime, default=utc_now, nullable=False)
 
     allocation = relationship("Allocation", back_populates="disbursement")
@@ -138,3 +139,17 @@ class Announcement(Base):
     sms_dispatched = Column(Boolean, default=False, nullable=False)
     recipients_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=utc_now, nullable=False)
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    username = Column(String(100), nullable=False, default="SYSTEM")
+    action = Column(String(100), nullable=False)  # e.g. 'UPDATE_MCDA_WEIGHTS', 'DISBURSE_PACKAGE'
+    target_entity = Column(String(100), nullable=False)  # e.g. 'AidProgram', 'Household'
+    target_id = Column(String(100), nullable=True)
+    details = Column(JSON, nullable=True)
+    ip_address = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+

@@ -162,6 +162,7 @@ class AllocationResponse(BaseModel):
 class VerifyScanRequest(BaseModel):
     claim_qr_hash: str
     notes: Optional[str] = None
+    signature_data: Optional[str] = None
 
 class DisbursementResponse(BaseModel):
     id: str
@@ -172,6 +173,19 @@ class DisbursementResponse(BaseModel):
     disbursed_at: datetime
     verified_by_name: str
     notes: Optional[str] = None
+    signature_data: Optional[str] = None
+
+# --- Audit Log Schemas ---
+class AuditLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    username: str
+    action: str
+    target_entity: str
+    target_id: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
 
 # --- Beneficiary Tracking Response ---
 class BeneficiaryTrackResponse(BaseModel):

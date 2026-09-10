@@ -103,14 +103,188 @@ function handleManualVerify(e) {
     }
 }
 
+let currentScanToken = null;
+let signatureCanvas = null;
+let signatureCtx = null;
+let isDrawing = false;
+let hasSignature = false;
+
+document.addEventListener("DOMContentLoaded", () => {
+    checkOfflineQueue();
+    window.addEventListener("online", syncOfflineQueue);
+});
+
+function checkOfflineQueue() {
+    try {
+        const queue = JSON.parse(localStorage.getItem("smartaid_offline_scans") || "[]");
+        let banner = document.getElementById("offline-queue-badge");
+        if (queue.length > 0) {
+            if (!banner) {
+                banner = document.createElement("div");
+                banner.id = "offline-queue-badge";
+                banner.className = "mb-4 p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-semibold flex items-center justify-between shadow-xs";
+                const wrapper = document.querySelector(".max-w-2xl");
+                if (wrapper) wrapper.insertBefore(banner, wrapper.firstChild);
+            }
+            banner.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="beacon-dot-amber"></span>
+                    <span>Offline Mode: <strong>${queue.length}</strong> claims pending upload</span>
+                </div>
+                <button onclick="syncOfflineQueue()" class="btn-press px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs">
+                    Sync Now
+                </button>
+            `;
+        } else if (banner) {
+            banner.remove();
+        }
+    } catch(e) {}
+}
+
+async function syncOfflineQueue() {
+    const queue = JSON.parse(localStorage.getItem("smartaid_offline_scans") || "[]");
+    if (!queue.length) return;
+    let synced = 0;
+    let remaining = [];
+
+    for (const item of queue) {
+        try {
+            const res = await fetch("/api/v1/disburse/verify-scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(item)
+            });
+            if (res.ok || res.status === 409) synced++;
+            else remaining.push(item);
+        } catch(e) {
+            remaining.push(item);
+        }
+    }
+    localStorage.setItem("smartaid_offline_scans", JSON.stringify(remaining));
+    checkOfflineQueue();
+    if (synced > 0) {
+        alert(`Successfully synced ${synced} offline relief disbursement records!`);
+    }
+}
+
 async function verifyClaimToken(token) {
+    currentScanToken = token;
+    hasSignature = false;
     const container = document.getElementById('scan-result-container');
     container.innerHTML = `
-        <div class="p-6 rounded-2xl bg-slate-100 text-center text-slate-500 space-y-2 animate-pulse">
-            <span class="animate-spin inline-block text-xl">⏳</span>
-            <p class="text-xs font-semibold">Validating cryptographic QR claim token...</p>
+        <div class="p-6 rounded-2xl bg-white border-2 border-indigo-500 shadow-xl space-y-4 animate-scale-in">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                        <i data-lucide="pen-tool" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-sm text-slate-900">Beneficiary Voucher E-Signature</h4>
+                        <p class="text-[11px] text-slate-500">Token: <span class="font-mono text-indigo-600">${token.slice(0, 18)}...</span></p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Step 2: Sign & Release
+                </span>
+            </div>
+
+            <div class="space-y-1.5">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-slate-600 font-semibold">Sign below with finger or stylus:</span>
+                    <button type="button" onclick="clearSignatureCanvas()" class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px]">
+                        Clear
+                    </button>
+                </div>
+                <div class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 relative overflow-hidden touch-none">
+                    <canvas id="sig-canvas" width="450" height="110" class="w-full h-28 block bg-white cursor-crosshair"></canvas>
+                    <div id="sig-hint" class="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs italic">
+                        Draw claimant signature here
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-between gap-3 border-t border-slate-100">
+                <button type="button" onclick="clearScanResult()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                    Cancel
+                </button>
+                <button type="button" onclick="submitFinalDisbursement('${token}')" id="confirm-disburse-btn"
+                    class="btn-press flex-1 sm:flex-initial px-6 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center justify-center gap-1.5 transition-all">
+                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                    <span>Confirm & Release Package</span>
+                </button>
+            </div>
         </div>
     `;
+    lucide.createIcons();
+    setupSignatureCanvas();
+}
+
+function setupSignatureCanvas() {
+    signatureCanvas = document.getElementById('sig-canvas');
+    if (!signatureCanvas) return;
+    signatureCtx = signatureCanvas.getContext('2d');
+    signatureCtx.lineWidth = 2.5;
+    signatureCtx.lineCap = 'round';
+    signatureCtx.strokeStyle = '#1e1b4b';
+
+    function getPos(e) {
+        const rect = signatureCanvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: (clientX - rect.left) * (signatureCanvas.width / rect.width),
+            y: (clientY - rect.top) * (signatureCanvas.height / rect.height)
+        };
+    }
+
+    function start(e) {
+        isDrawing = true;
+        hasSignature = true;
+        document.getElementById('sig-hint')?.classList.add('hidden');
+        const pos = getPos(e);
+        signatureCtx.beginPath();
+        signatureCtx.moveTo(pos.x, pos.y);
+        e.preventDefault();
+    }
+
+    function move(e) {
+        if (!isDrawing) return;
+        const pos = getPos(e);
+        signatureCtx.lineTo(pos.x, pos.y);
+        signatureCtx.stroke();
+        e.preventDefault();
+    }
+
+    function end() {
+        isDrawing = false;
+        signatureCtx.closePath();
+    }
+
+    signatureCanvas.addEventListener('mousedown', start);
+    signatureCanvas.addEventListener('mousemove', move);
+    signatureCanvas.addEventListener('mouseup', end);
+
+    signatureCanvas.addEventListener('touchstart', start, { passive: false });
+    signatureCanvas.addEventListener('touchmove', move, { passive: false });
+    signatureCanvas.addEventListener('touchend', end);
+}
+
+function clearSignatureCanvas() {
+    if (!signatureCanvas || !signatureCtx) return;
+    signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+    hasSignature = false;
+    document.getElementById('sig-hint')?.classList.remove('hidden');
+}
+
+async function submitFinalDisbursement(token) {
+    const btn = document.getElementById('confirm-disburse-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="animate-spin mr-1">⏳</span> Verifying & Recording...`;
+    }
+
+    const canvas = document.getElementById('sig-canvas');
+    const sigData = (canvas && hasSignature) ? canvas.toDataURL('image/png') : null;
 
     try {
         const res = await fetch('/api/v1/disburse/verify-scan', {
@@ -118,19 +292,44 @@ async function verifyClaimToken(token) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 claim_qr_hash: token,
-                notes: "Verified via Field Station Camera Scanner."
+                notes: 'Verified via Field Station Camera Scanner.',
+                signature_data: sigData
             })
         });
 
         const data = await res.json();
         renderVerificationResponse(data, res.status);
-
     } catch (err) {
+        const queue = JSON.parse(localStorage.getItem('smartaid_offline_scans') || '[]');
+        queue.push({
+            claim_qr_hash: token,
+            notes: 'Offline release in remote area.',
+            signature_data: sigData,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('smartaid_offline_scans', JSON.stringify(queue));
+        checkOfflineQueue();
+
+        const container = document.getElementById('scan-result-container');
         container.innerHTML = `
-            <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold animate-shake">
-                Network connection error: ${err.message}
+            <div class="p-6 rounded-2xl bg-amber-50 border-2 border-amber-500 shadow-xl space-y-3 animate-scale-in">
+                <div class="flex items-center gap-3 text-amber-800">
+                    <div class="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center">
+                        <i data-lucide="cloud-off" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm text-amber-950">Claim Recorded in Offline Storage</h4>
+                        <p class="text-xs text-amber-700">Digital signature captured and queued locally. It will automatically upload once cellular reception resumes.</p>
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end">
+                    <button onclick="clearScanResult()" class="btn-press px-4 py-2 rounded-lg text-xs font-semibold bg-amber-700 text-white">
+                        Scan Next Beneficiary
+                    </button>
+                </div>
             </div>
         `;
+        lucide.createIcons();
     }
 }
 
@@ -183,6 +382,13 @@ function renderVerificationResponse(data, httpStatus) {
                     <div class="p-2.5 rounded-xl bg-white border border-emerald-200/80">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Field Verifier</p>
                         <p class="font-semibold text-slate-700 mt-0.5">${data.verified_by}</p>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-white border border-emerald-200/80 col-span-2">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Liquidation Proof / E-Signature</p>
+                        <p class="font-semibold text-emerald-700 mt-0.5 flex items-center gap-1.5">
+                            <i data-lucide="check-check" class="w-4 h-4 text-emerald-600"></i>
+                            <span>${data.has_signature ? "Digitally Signed by Beneficiary & Recorded in Audit Trail" : "Verified by Field Officer"}</span>
+                        </p>
                     </div>
                 </div>
 

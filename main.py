@@ -1,4 +1,5 @@
 import io
+import csv
 import os
 import sys
 import random
@@ -37,13 +38,13 @@ import qrcode
 from PIL import Image
 
 from database import engine, get_db, Base
-from models import User, Household, HouseholdMember, AidProgram, ProgramRule, Allocation, Disbursement, Announcement
+from models import User, Household, HouseholdMember, AidProgram, ProgramRule, Allocation, Disbursement, Announcement, AuditLog
 from schemas import (
     Token, UserLogin, UserCreate, UserResponse,
     HouseholdCreate, HouseholdResponse, HouseholdUpdate,
     AidProgramCreate, AidProgramResponse, ProgramRuleCreate, ProgramRuleUpdate, ProgramRuleResponse,
     AllocationResponse, VerifyScanRequest, DisbursementResponse, BeneficiaryTrackResponse,
-    AnnouncementCreate, AnnouncementResponse
+    AnnouncementCreate, AnnouncementResponse, AuditLogResponse
 )
 from auth import (
     verify_password, get_password_hash, create_access_token,
@@ -82,6 +83,59 @@ def generate_reference_number(db: Session) -> str:
         ref = f"APP-{year}-{suffix}"
         if not db.query(Household).filter(Household.reference_number == ref).first():
             return ref
+
+def log_audit_event(
+    db: Session,
+    action: str,
+    target_entity: str,
+    target_id: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    user: Optional[User] = None,
+    ip_address: Optional[str] = None
+):
+    try:
+        log = AuditLog(
+            user_id=user.id if user else None,
+            username=user.username if user else "PUBLIC / SYSTEM",
+            action=action,
+            target_entity=target_entity,
+            target_id=str(target_id) if target_id else None,
+            details=details or {},
+            ip_address=ip_address
+        )
+        db.add(log)
+        db.commit()
+    except Exception as e:
+        print(f"[AUDIT LOG WARNING] {e}")
+
+def dispatch_single_sms(phone: str, message: str) -> bool:
+    api_key = os.environ.get("SEMAPHORE_API_KEY", "").strip()
+    clean_phone = phone.replace(" ", "").replace("-", "").strip()
+    if clean_phone.startswith("+63"):
+        clean_phone = "0" + clean_phone[3:]
+    
+    if not clean_phone.startswith("09") or len(clean_phone) != 11:
+        return False
+        
+    sender_name = os.environ.get("SEMAPHORE_SENDER_NAME", "SmartAid").strip()
+    print(f"[SMS DISPATCH] To: {clean_phone} | Msg: {message}")
+    if not api_key:
+        print("[SMS SIMULATION] No SEMAPHORE_API_KEY set. Simulated delivery.")
+        return True
+        
+    try:
+        sms_data = urllib.parse.urlencode({
+            "apikey": api_key,
+            "number": clean_phone,
+            "message": f"LGU MARAMAG MSWDO: {message}",
+            "sendername": sender_name
+        }).encode("utf-8")
+        req = urllib.request.Request("https://api.semaphore.co/api/v4/messages", data=sms_data, method="POST")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status == 200
+    except Exception as e:
+        print(f"[SMS WARNING] Failed sending SMS: {e}")
+        return False
 
 # ==========================================
 # WEB TEMPLATE VIEWS
@@ -358,6 +412,23 @@ async def update_program_rules(
 
     db.commit()
     db.refresh(rules)
+
+    log_audit_event(
+        db,
+        action="UPDATE_MCDA_WEIGHTS",
+        target_entity="ProgramRule",
+        target_id=rules.id,
+        details={
+            "program_id": program_id,
+            "weight_income": rules.weight_income,
+            "weight_dependency": rules.weight_dependency,
+            "weight_calamity": rules.weight_calamity,
+            "weight_housing": rules.weight_housing,
+            "income_ceiling": rules.income_ceiling
+        },
+        user=current_user
+    )
+
     return rules
 
 # ==========================================
@@ -365,7 +436,7 @@ async def update_program_rules(
 # ==========================================
 
 @app.post("/api/v1/apply", response_model=HouseholdResponse)
-async def submit_application(household_in: HouseholdCreate, db: Session = Depends(get_db)):
+async def submit_application(household_in: HouseholdCreate, request: Request, db: Session = Depends(get_db)):
     ref_number = generate_reference_number(db)
 
     # Compute dependent counts
@@ -404,6 +475,27 @@ async def submit_application(household_in: HouseholdCreate, db: Session = Depend
 
     db.commit()
     db.refresh(household)
+
+    log_audit_event(
+        db,
+        action="SUBMIT_INTAKE",
+        target_entity="Household",
+        target_id=household.id,
+        details={
+            "reference_number": household.reference_number,
+            "head_name": household.head_name,
+            "barangay": household.barangay,
+            "income": household.monthly_income,
+            "member_count": household.member_count
+        },
+        ip_address=request.client.host if request.client else None
+    )
+
+    if household.contact_number:
+        dispatch_single_sms(
+            household.contact_number,
+            f"Kumusta {household.head_name}, nadawat ang imong rehistrasyon sa SmartAid. Imong Reference No: {household.reference_number}. Susiha sa smartaid.lgu/track"
+        )
 
     # Auto-evaluate into active program if exists
     active_program = db.query(AidProgram).filter(AidProgram.status == "Active").first()
@@ -505,6 +597,21 @@ async def update_household(
         except Exception as e:
             print(f"Re-evaluation after household update warning: {e}")
 
+    log_audit_event(
+        db,
+        action="UPDATE_HOUSEHOLD",
+        target_entity="Household",
+        target_id=household.id,
+        details={
+            "reference_number": household.reference_number,
+            "head_name": household.head_name,
+            "barangay": household.barangay,
+            "income": household.monthly_income,
+            "member_count": household.member_count
+        },
+        user=current_user
+    )
+
     return household
 
 @app.delete("/api/v1/households/{household_id}")
@@ -516,6 +623,19 @@ async def delete_household(
     household = db.query(Household).filter(Household.id == household_id).first()
     if not household:
         raise HTTPException(status_code=404, detail="Household record not found.")
+
+    log_audit_event(
+        db,
+        action="DELETE_HOUSEHOLD",
+        target_entity="Household",
+        target_id=household_id,
+        details={
+            "head_name": household.head_name,
+            "reference_number": household.reference_number,
+            "barangay": household.barangay
+        },
+        user=current_user
+    )
 
     allocations = db.query(Allocation).filter(Allocation.household_id == household_id).all()
     for alloc in allocations:
@@ -653,7 +773,8 @@ async def get_program_allocations(
             disb_data = {
                 "disbursed_at": a.disbursement.disbursed_at.isoformat(),
                 "verified_by": a.disbursement.verified_by.full_name if a.disbursement.verified_by else "Staff",
-                "notes": a.disbursement.notes
+                "notes": a.disbursement.notes,
+                "has_signature": bool(a.disbursement.signature_data)
             }
 
         a_dict = {
@@ -746,11 +867,26 @@ async def verify_and_disburse(
         allocation_id=allocation.id,
         verified_by_user_id=current_user.id,
         notes=payload.notes or "Verified via field QR camera scan.",
+        signature_data=payload.signature_data,
         disbursed_at=datetime.now(timezone.utc)
     )
     db.add(disbursement)
     db.commit()
     db.refresh(disbursement)
+
+    log_audit_event(
+        db,
+        action="DISBURSE_PACKAGE",
+        target_entity="Disbursement",
+        target_id=disbursement.id,
+        details={
+            "reference_number": allocation.household.reference_number,
+            "head_name": allocation.household.head_name,
+            "barangay": allocation.household.barangay,
+            "has_signature": bool(payload.signature_data)
+        },
+        user=current_user
+    )
 
     return {
         "status": "SUCCESS",
@@ -765,7 +901,8 @@ async def verify_and_disburse(
         "program_name": allocation.program.program_name if allocation.program else "Aid Program",
         "budget_amount": allocation.program.budget_per_slot if allocation.program else 0.0,
         "disbursed_at": disbursement.disbursed_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "verified_by": current_user.full_name
+        "verified_by": current_user.full_name,
+        "has_signature": bool(disbursement.signature_data)
     }
 
 @app.get("/api/v1/qr/{claim_qr_hash}")
@@ -973,6 +1110,130 @@ async def list_notifications(
         query = query.filter((Announcement.target_barangay == None) | (Announcement.target_barangay == barangay))
     
     return query.limit(20).all()
+
+# ==========================================
+# REST API V1: OFFICIAL COA REPORTS & AUDIT
+# ==========================================
+
+@app.get("/api/v1/reports/allocations/export")
+async def export_allocations_csv(
+    program_id: Optional[str] = None,
+    barangay: Optional[str] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_worker_or_barangay)
+):
+    query = db.query(Allocation).join(Household, Allocation.household_id == Household.id)
+    if program_id:
+        query = query.filter(Allocation.program_id == program_id)
+    else:
+        active_prog = db.query(AidProgram).filter(AidProgram.status == "Active").first()
+        if active_prog:
+            query = query.filter(Allocation.program_id == active_prog.id)
+
+    # Enforce barangay desk officer restriction
+    if current_user.role == "barangay_staff" and current_user.assigned_barangay:
+        query = query.filter(Household.barangay == current_user.assigned_barangay)
+    elif barangay and barangay != "All":
+        query = query.filter(Household.barangay == barangay)
+
+    if status and status != "All":
+        query = query.filter(Allocation.status == status)
+
+    allocations = query.all()
+
+    def alloc_sort(a: Allocation):
+        if a.status == "Approved":
+            return (0, a.rank if a.rank > 0 else 9999)
+        elif a.status == "Waitlisted":
+            return (1, a.rank if a.rank > 0 else 9999)
+        return (2, 999999)
+    allocations.sort(key=alloc_sort)
+
+    output = io.StringIO()
+    output.write("\ufeff")  # UTF-8 BOM for Microsoft Excel compatibility
+    writer = csv.writer(output)
+    
+    writer.writerow(["MUNICIPALITY OF MARAMAG, BUKIDNON - MSWDO"])
+    writer.writerow(["OFFICIAL BENEFICIARY ALLOCATION & PAYROLL MASTERLIST"])
+    writer.writerow([f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", f"Generated By: {current_user.full_name} ({current_user.role})"])
+    writer.writerow([])
+    
+    headers = [
+        "Priority Rank",
+        "Application Ref",
+        "Head of Household",
+        "Barangay",
+        "Purok / Zone",
+        "Street Address",
+        "Contact Number",
+        "Monthly Income (PHP)",
+        "Family Members",
+        "PWD Count",
+        "Senior Count",
+        "Informal Settler",
+        "Calamity Damage",
+        "VPI Vulnerability Score",
+        "Allocation Status",
+        "QR Claim Token",
+        "Disbursement Status",
+        "Disbursed Date & Time",
+        "Disbursing Officer",
+        "Beneficiary Signature / Thumbmark"
+    ]
+    writer.writerow(headers)
+
+    for a in allocations:
+        h = a.household
+        disb = a.disbursement
+        is_disb = disb is not None
+        disb_time = disb.disbursed_at.strftime("%Y-%m-%d %H:%M:%S UTC") if is_disb else "Unclaimed"
+        officer = disb.verified_by.full_name if (is_disb and disb.verified_by) else ""
+        has_sig = "Digital Signed" if (is_disb and disb.signature_data) else ("Signed" if is_disb else "")
+
+        writer.writerow([
+            f"#{a.rank}" if a.rank > 0 else "N/A",
+            h.reference_number,
+            h.head_name,
+            h.barangay,
+            h.purok_zone,
+            h.street_address,
+            h.contact_number,
+            f"{h.monthly_income:.2f}",
+            h.member_count,
+            h.pwd_count,
+            h.elderly_count,
+            "YES" if h.is_informal_settler else "NO",
+            "YES" if h.has_calamity_damage else "NO",
+            f"{a.vulnerability_score:.4f}",
+            a.status,
+            a.claim_qr_hash or "",
+            "CLAIMED" if is_disb else ("READY_TO_CLAIM" if a.status == "Approved" else "PENDING"),
+            disb_time,
+            officer,
+            has_sig or "[ _________________________ ]"
+        ])
+
+    csv_data = output.getvalue()
+    output.close()
+
+    filename = f"smartaid_masterlist_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{filename}\"",
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+        }
+    )
+
+@app.get("/api/v1/audit-logs", response_model=List[AuditLogResponse])
+async def list_audit_logs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    return db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
 
 if __name__ == "__main__":
     import uvicorn

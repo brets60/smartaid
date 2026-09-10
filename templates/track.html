@@ -28,22 +28,22 @@
     <div id="track-search-section" class="glass-panel p-6 sm:p-7 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/90 animate-slide-up">
         <div class="flex items-center gap-2 mb-1">
             <span class="beacon-dot"></span>
-            <h2 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Beneficiary Application Tracker</h2>
+            <h2 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight" data-i18n="track_title">Beneficiary Relief Voucher Tracker</h2>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Enter your official application reference number to verify real-time MCDA priority scoring and access your cryptographic QR claim voucher.</p>
+        <p class="text-xs text-slate-500 mb-4" data-i18n="track_subtitle">Enter your official application reference number to verify real-time MCDA priority scoring and access your cryptographic QR claim voucher.</p>
 
         <form id="track-search-form" onsubmit="lookupReference(event)" class="flex gap-2">
             <div class="relative flex-1">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <i data-lucide="ticket" class="w-4 h-4"></i>
                 </div>
-                <input type="text" id="track-input-ref" value="{{ initial_ref }}" required placeholder="e.g. APP-2026-00101"
+                <input type="text" id="track-input-ref" value="{{ initial_ref }}" required placeholder="e.g. APP-2026-00101" data-i18n-placeholder="lbl_enter_ref"
                     class="block w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold uppercase focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all">
             </div>
             <button type="submit" id="track-search-btn"
                 class="btn-press px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all">
                 <i data-lucide="search" class="w-4 h-4"></i>
-                <span>Search</span>
+                <span data-i18n="btn_search_status">Search</span>
             </button>
         </form>
     </div>

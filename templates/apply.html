@@ -54,19 +54,19 @@
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div class="sm:col-span-2">
-                        <label class="block text-xs font-semibold text-slate-700">Full Name of Household Head *</label>
-                        <input type="text" id="head_name" required placeholder="e.g. Juanita Dela Cruz"
+                        <label class="block text-xs font-semibold text-slate-700" data-i18n="lbl_fullname">Full Name of Household Head *</label>
+                        <input type="text" id="head_name" required placeholder="e.g. Juanita Dela Cruz" data-i18n-placeholder="ph_fullname"
                             class="mt-1 block w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700">Contact / Mobile Number *</label>
-                        <input type="tel" id="contact_number" required placeholder="0917XXXXXXX"
+                        <label class="block text-xs font-semibold text-slate-700" data-i18n="lbl_contact">Contact / Mobile Number *</label>
+                        <input type="tel" id="contact_number" required placeholder="0917XXXXXXX" data-i18n-placeholder="ph_contact"
                             class="mt-1 block w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700">Barangay (Municipality of Maramag) *</label>
+                        <label class="block text-xs font-semibold text-slate-700" data-i18n="lbl_barangay">Barangay (Municipality of Maramag) *</label>
                         <select id="barangay" required
                             class="mt-1 block w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white transition-all">
                             <option value="North Poblacion">📍 North Poblacion</option>
@@ -115,7 +115,7 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div class="sm:col-span-2">
-                        <label class="block text-xs font-semibold text-slate-700">Total Combined Monthly Household Income (₱) *</label>
+                        <label class="block text-xs font-semibold text-slate-700" data-i18n="lbl_income">Total Combined Monthly Household Income (₱) *</label>
                         <div class="mt-1 relative rounded-xl shadow-2xs">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
                                 ₱
@@ -123,23 +123,23 @@
                             <input type="number" id="monthly_income" required min="0" step="100" placeholder="0.00"
                                 class="block w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all">
                         </div>
-                        <p class="text-[11px] text-slate-400 mt-1">Income ceiling filter is ₱15,000.00. Casual wages, informal earnings, and remittances must be declared.</p>
+                        <p class="text-[11px] text-slate-400 mt-1" data-i18n="income_helper">Income ceiling filter is ₱15,000.00. Casual wages, informal earnings, and remittances must be declared.</p>
                     </div>
 
                     <div class="sm:col-span-2 space-y-3 pt-1">
                         <label class="relative flex items-start gap-3 p-3.5 rounded-xl border border-slate-200/80 hover:bg-slate-50/80 cursor-pointer transition-all card-hover">
                             <input type="checkbox" id="is_informal_settler" class="h-4 w-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
                             <div>
-                                <span class="text-xs font-bold text-slate-800">Informal Settler / Precarious Housing (+20% Weight)</span>
-                                <p class="text-[11px] text-slate-500">Check if living in an informal settlement, temporary shelter, or without formal land tenure.</p>
+                                <span class="text-xs font-bold text-slate-800" data-i18n="lbl_informal">Informal Settler / Precarious Housing (+20% Weight)</span>
+                                <p class="text-[11px] text-slate-500" data-i18n="desc_informal">Check if living in an informal settlement, temporary shelter, or without formal land tenure.</p>
                             </div>
                         </label>
 
                         <label class="relative flex items-start gap-3 p-3.5 rounded-xl border border-slate-200/80 hover:bg-slate-50/80 cursor-pointer transition-all card-hover">
                             <input type="checkbox" id="has_calamity_damage" class="h-4 w-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
                             <div>
-                                <span class="text-xs font-bold text-slate-800">Severe Calamity / Typhoon Damage (+20% Weight)</span>
-                                <p class="text-[11px] text-slate-500">Check if the household sustained major flood, wind, or landslide damage in recent disasters.</p>
+                                <span class="text-xs font-bold text-slate-800" data-i18n="lbl_calamity">Severe Calamity / Typhoon Damage (+20% Weight)</span>
+                                <p class="text-[11px] text-slate-500" data-i18n="desc_calamity">Check if the household sustained major flood, wind, or landslide damage in recent disasters.</p>
                             </div>
                         </label>
                     </div>
@@ -151,15 +151,15 @@
                 <div class="flex items-center justify-between pb-3 border-b border-slate-200/80">
                     <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                         <span class="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs">3</span>
-                        Additional Household Members Roster
+                        <span data-i18n="members_header">Additional Household Members Roster</span>
                     </h3>
                     <button type="button" onclick="addMemberRow()"
                         class="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-all">
                         <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
-                        <span>Add Family Member</span>
+                        <span data-i18n="btn_add_member">Add Family Member</span>
                     </button>
                 </div>
-                <p class="text-xs text-slate-500">
+                <p class="text-xs text-slate-500" data-i18n="members_intro">
                     List dependents living in the same home. Marking Persons with Disability (PWD) or Senior Citizens increases demographic vulnerability priority.
                 </p>
 
@@ -173,7 +173,7 @@
                 <button type="submit" id="submit-intake-btn"
                     class="btn-press w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25 transition-all">
                     <i data-lucide="send" class="w-4 h-4"></i>
-                    <span>Submit Official Assistance Registration</span>
+                    <span data-i18n="btn_submit_intake">Submit Official Assistance Registration</span>
                 </button>
             </div>
 
